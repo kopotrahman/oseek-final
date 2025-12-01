@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { Application, Job, JobSeekerProfile, CompanyProfile } = require("../models");
+const { Application, Job, JobSeekerProfile } = require("../models");
 const { auth } = require("../middleware");
 
 /**
@@ -134,7 +134,7 @@ router.get("/stats", auth, async (req, res) => {
  */
 router.get("/activity", auth, async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
     const activities = [];
 
     if (req.user.role === "seeker") {

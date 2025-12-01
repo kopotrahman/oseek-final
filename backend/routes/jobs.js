@@ -3,6 +3,9 @@ const router = express.Router();
 const { Job, Application, CompanyProfile } = require("../models");
 const { auth, authorize } = require("../middleware");
 
+// Helper function to escape regex special characters to prevent ReDoS
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /**
  * @swagger
  * components:
@@ -138,15 +141,19 @@ const { auth, authorize } = require("../middleware");
  */
 router.get("/", async (req, res) => {
   try {
-    const { q, type, location, page = 1, limit = 10 } = req.query;
+    const { q, type, location } = req.query;
+    // Validate page and limit parameters
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
     const query = { status: "open" };
 
-    // Search query
+    // Search query with escaped regex to prevent ReDoS
     if (q) {
+      const escapedQ = escapeRegex(q);
       query.$or = [
-        { title: { $regex: q, $options: "i" } },
-        { description: { $regex: q, $options: "i" } },
-        { location: { $regex: q, $options: "i" } },
+        { title: { $regex: escapedQ, $options: "i" } },
+        { description: { $regex: escapedQ, $options: "i" } },
+        { location: { $regex: escapedQ, $options: "i" } },
       ];
     }
 
@@ -155,42 +162,90 @@ router.get("/", async (req, res) => {
       query.type = type;
     }
 
-    // Location filter
+    // Location filter with escaped regex to prevent ReDoS
     if (location) {
-      query.location = { $regex: location, $options: "i" };
+      const escapedLocation = escapeRegex(location);
+      query.location = { $regex: escapedLocation, $options: "i" };
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (page - 1) * limit;
     const total = await Job.countDocuments(query);
 
-    const jobs = await Job.find(query)
-      .populate("company", "name")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+    // Use aggregation with $lookup to avoid N+1 query problem
+    const jobsWithCompanyInfo = await Job.aggregate([
+      { $match: query },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: "companyprofiles",
+          localField: "company",
+          foreignField: "user",
+          as: "companyProfile"
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "company",
+          foreignField: "_id",
+          as: "companyUser"
+        }
+      }
+    ]);
 
-    // Get company profiles for job listings
-    const jobsWithCompanyInfo = await Promise.all(
-      jobs.map(async (job) => {
-        const companyProfile = await CompanyProfile.findOne({ user: job.company._id });
-        return {
-          ...job.toObject(),
-          companyName: companyProfile?.companyName || job.company.name,
-          companyLogo: companyProfile?.logo || "",
-        };
-      })
-    );
+    // Flatten companyProfile and companyUser arrays, and set companyName/companyLogo
+    const jobsWithCompanyInfoMapped = jobsWithCompanyInfo.map(job => {
+      const companyProfile = job.companyProfile && job.companyProfile[0];
+      const companyUser = job.companyUser && job.companyUser[0];
+      // Remove the lookup arrays from the response
+      const { companyProfile: _, companyUser: __, ...jobData } = job;
+      return {
+        ...jobData,
+        companyName: companyProfile?.companyName || companyUser?.name || "",
+        companyLogo: companyProfile?.logo || "",
+      };
+    });
 
     res.json({
-      jobs: jobsWithCompanyInfo,
+      jobs: jobsWithCompanyInfoMapped,
       pagination: {
         total,
-        page: parseInt(page),
-        pages: Math.ceil(total / parseInt(limit)),
+        page,
+        pages: Math.ceil(total / limit),
       },
     });
   } catch (error) {
     console.error("Get jobs error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/jobs/company/my-jobs:
+ *   get:
+ *     summary: Get all jobs posted by the logged-in company
+ *     tags: [Jobs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of company's jobs
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Job'
+ */
+router.get("/company/my-jobs", auth, authorize("company"), async (req, res) => {
+  try {
+    const jobs = await Job.find({ company: req.user._id }).sort({ createdAt: -1 });
+    res.json(jobs);
+  } catch (error) {
+    console.error("Get company jobs error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -384,42 +439,13 @@ router.delete("/:id", auth, authorize("company"), async (req, res) => {
       return res.status(403).json({ message: "Not authorized to delete this job" });
     }
 
-    // Delete applications first, then delete the job
-    // This order ensures we don't have orphaned references
+    // Delete related applications first to prevent orphaned application records, then delete the job
     await Application.deleteMany({ job: req.params.id });
     await Job.findByIdAndDelete(req.params.id);
 
     res.json({ message: "Job deleted successfully" });
   } catch (error) {
     console.error("Delete job error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-/**
- * @swagger
- * /api/jobs/company/my-jobs:
- *   get:
- *     summary: Get all jobs posted by the logged-in company
- *     tags: [Jobs]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of company's jobs
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Job'
- */
-router.get("/company/my-jobs", auth, authorize("company"), async (req, res) => {
-  try {
-    const jobs = await Job.find({ company: req.user._id }).sort({ createdAt: -1 });
-    res.json(jobs);
-  } catch (error) {
-    console.error("Get company jobs error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });

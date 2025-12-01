@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const mongoose = require("mongoose");
 const { Application, Job, JobSeekerProfile } = require("../models");
 const { auth, authorize } = require("../middleware");
 
@@ -197,22 +198,46 @@ router.get("/job/:jobId", auth, authorize("company"), async (req, res) => {
       return res.status(403).json({ message: "Not authorized to view these applications" });
     }
 
-    const applications = await Application.find({ job: req.params.jobId })
-      .populate("applicant", "name email")
-      .sort({ createdAt: -1 });
+    // Use aggregation with $lookup to avoid N+1 query problem
+    const applicationsWithProfiles = await Application.aggregate([
+      { $match: { job: new mongoose.Types.ObjectId(req.params.jobId) } },
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "applicant",
+          foreignField: "_id",
+          as: "applicantUser"
+        }
+      },
+      {
+        $lookup: {
+          from: "jobseekerprofiles",
+          localField: "applicant",
+          foreignField: "user",
+          as: "applicantProfile"
+        }
+      }
+    ]);
 
-    // Get seeker profiles for more details
-    const applicationsWithProfiles = await Promise.all(
-      applications.map(async (app) => {
-        const profile = await JobSeekerProfile.findOne({ user: app.applicant._id });
-        return {
-          ...app.toObject(),
-          applicantProfile: profile,
-        };
-      })
-    );
+    // Flatten the arrays and format the response
+    const formattedApplications = applicationsWithProfiles.map(app => {
+      const applicantUser = app.applicantUser && app.applicantUser[0];
+      const applicantProfile = app.applicantProfile && app.applicantProfile[0];
+      // Remove the lookup arrays from the response
+      const { applicantUser: _, applicantProfile: __, ...appData } = app;
+      return {
+        ...appData,
+        applicant: {
+          _id: applicantUser?._id,
+          name: applicantUser?.name,
+          email: applicantUser?.email
+        },
+        applicantProfile: applicantProfile || null,
+      };
+    });
 
-    res.json(applicationsWithProfiles);
+    res.json(formattedApplications);
   } catch (error) {
     console.error("Get job applications error:", error);
     res.status(500).json({ message: "Server error" });

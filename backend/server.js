@@ -26,8 +26,8 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // 🛡️ Apply rate limiting
+app.use("/api/auth", authLimiter); // Stricter limit for auth routes (must be before apiLimiter)
 app.use("/api/", apiLimiter); // General rate limit for all API routes
-app.use("/api/auth", authLimiter); // Stricter limit for auth routes
 
 // 📚 Swagger Documentation
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
@@ -76,8 +76,8 @@ app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// ⚠️ Error Handler
-app.use((err, req, res, next) => {
+// ⚠️ Error Handler (terminal error handler - next parameter intentionally unused)
+app.use((err, req, res, _next) => {
   console.error("Server error:", err);
   res.status(500).json({ message: "Internal server error" });
 });

@@ -209,6 +209,10 @@ router.post("/skills", auth, authorize("seeker"), async (req, res) => {
       { new: true }
     );
 
+    if (!profile) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
+
     res.json(profile);
   } catch (error) {
     console.error("Add skill error:", error);
@@ -244,6 +248,10 @@ router.delete("/skills/:skill", auth, authorize("seeker"), async (req, res) => {
       { $pull: { skills: skill } },
       { new: true }
     );
+
+    if (!profile) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
 
     res.json(profile);
   } catch (error) {
@@ -287,6 +295,10 @@ router.post("/experience", auth, authorize("seeker"), async (req, res) => {
       },
       { new: true }
     );
+
+    if (!profile) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
 
     res.json(profile);
   } catch (error) {
@@ -382,6 +394,10 @@ router.delete("/experience/:id", auth, authorize("seeker"), async (req, res) => 
       { new: true }
     );
 
+    if (!profile) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
+
     res.json(profile);
   } catch (error) {
     console.error("Delete experience error:", error);
@@ -424,6 +440,10 @@ router.post("/education", auth, authorize("seeker"), async (req, res) => {
       },
       { new: true }
     );
+
+    if (!profile) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
 
     res.json(profile);
   } catch (error) {
@@ -517,6 +537,10 @@ router.delete("/education/:id", auth, authorize("seeker"), async (req, res) => {
       { $pull: { education: { _id: id } } },
       { new: true }
     );
+
+    if (!profile) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
 
     res.json(profile);
   } catch (error) {
