@@ -1,0 +1,362 @@
+const express = require("express");
+const router = express.Router();
+const mongoose = require("mongoose");
+const { Application, Job, JobSeekerProfile } = require("../models");
+const { auth, authorize } = require("../middleware");
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Application:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *         job:
+ *           type: string
+ *         applicant:
+ *           type: string
+ *         coverLetter:
+ *           type: string
+ *         resumeUrl:
+ *           type: string
+ *         status:
+ *           type: string
+ *           enum: [pending, reviewing, shortlisted, rejected, accepted]
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *     ApplicationCreateRequest:
+ *       type: object
+ *       required:
+ *         - jobId
+ *       properties:
+ *         jobId:
+ *           type: string
+ *         coverLetter:
+ *           type: string
+ *         resumeUrl:
+ *           type: string
+ */
+
+/**
+ * @swagger
+ * /api/applications:
+ *   post:
+ *     summary: Apply to a job
+ *     tags: [Applications]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ApplicationCreateRequest'
+ *     responses:
+ *       201:
+ *         description: Application submitted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Application'
+ *       400:
+ *         description: Already applied or job closed
+ *       404:
+ *         description: Job not found
+ */
+router.post("/", auth, authorize("seeker"), async (req, res) => {
+  try {
+    const { jobId, coverLetter, resumeUrl } = req.body;
+
+    if (!jobId) {
+      return res.status(400).json({ message: "Job ID is required" });
+    }
+
+    // Check if job exists and is open
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    if (job.status !== "open") {
+      return res.status(400).json({ message: "This job is no longer accepting applications" });
+    }
+
+    // Check if already applied
+    const existingApplication = await Application.findOne({
+      job: jobId,
+      applicant: req.user._id,
+    });
+
+    if (existingApplication) {
+      return res.status(400).json({ message: "You have already applied for this job" });
+    }
+
+    // Get seeker's resume if not provided
+    let resumeUrlToSave = resumeUrl;
+    if (!resumeUrlToSave) {
+      const profile = await JobSeekerProfile.findOne({ user: req.user._id });
+      resumeUrlToSave = profile?.resumeUrl || "";
+    }
+
+    const application = new Application({
+      job: jobId,
+      applicant: req.user._id,
+      coverLetter: coverLetter || "",
+      resumeUrl: resumeUrlToSave,
+    });
+
+    await application.save();
+
+    // Update job applications count
+    await Job.findByIdAndUpdate(jobId, { $inc: { applicationsCount: 1 } });
+
+    res.status(201).json(application);
+  } catch (error) {
+    console.error("Apply error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/applications/my-applications:
+ *   get:
+ *     summary: Get all applications by the logged-in job seeker
+ *     tags: [Applications]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of applications
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Application'
+ */
+router.get("/my-applications", auth, authorize("seeker"), async (req, res) => {
+  try {
+    const applications = await Application.find({ applicant: req.user._id })
+      .populate({
+        path: "job",
+        populate: {
+          path: "company",
+          select: "name",
+        },
+      })
+      .sort({ createdAt: -1 });
+
+    res.json(applications);
+  } catch (error) {
+    console.error("Get my applications error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/applications/job/{jobId}:
+ *   get:
+ *     summary: Get all applications for a specific job (company only)
+ *     tags: [Applications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Job ID
+ *     responses:
+ *       200:
+ *         description: List of applications
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Application'
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Job not found
+ */
+router.get("/job/:jobId", auth, authorize("company"), async (req, res) => {
+  try {
+    const job = await Job.findById(req.params.jobId);
+
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    if (job.company.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized to view these applications" });
+    }
+
+    // Use aggregation with $lookup to avoid N+1 query problem
+    const applicationsWithProfiles = await Application.aggregate([
+      { $match: { job: new mongoose.Types.ObjectId(req.params.jobId) } },
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "applicant",
+          foreignField: "_id",
+          as: "applicantUser"
+        }
+      },
+      {
+        $lookup: {
+          from: "jobseekerprofiles",
+          localField: "applicant",
+          foreignField: "user",
+          as: "applicantProfile"
+        }
+      }
+    ]);
+
+    // Flatten the arrays and format the response
+    const formattedApplications = applicationsWithProfiles.map(app => {
+      const applicantUser = app.applicantUser && app.applicantUser[0];
+      const applicantProfile = app.applicantProfile && app.applicantProfile[0];
+      // Remove the lookup arrays from the response
+      const { applicantUser: _, applicantProfile: __, ...appData } = app;
+      return {
+        ...appData,
+        applicant: {
+          _id: applicantUser?._id,
+          name: applicantUser?.name,
+          email: applicantUser?.email
+        },
+        applicantProfile: applicantProfile || null,
+      };
+    });
+
+    res.json(formattedApplications);
+  } catch (error) {
+    console.error("Get job applications error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/applications/{id}/status:
+ *   put:
+ *     summary: Update application status (company only)
+ *     tags: [Applications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Application ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [pending, reviewing, shortlisted, rejected, accepted]
+ *     responses:
+ *       200:
+ *         description: Application status updated
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Application not found
+ */
+router.put("/:id/status", auth, authorize("company"), async (req, res) => {
+  try {
+    const { status } = req.body;
+    const validStatuses = ["pending", "reviewing", "shortlisted", "rejected", "accepted"];
+
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({ message: "Valid status is required" });
+    }
+
+    const application = await Application.findById(req.params.id).populate("job");
+
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    if (application.job.company.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized to update this application" });
+    }
+
+    application.status = status;
+    await application.save();
+
+    res.json(application);
+  } catch (error) {
+    console.error("Update application status error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/applications/{id}:
+ *   delete:
+ *     summary: Withdraw an application (seeker only)
+ *     tags: [Applications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Application ID
+ *     responses:
+ *       200:
+ *         description: Application withdrawn
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Application not found
+ */
+router.delete("/:id", auth, authorize("seeker"), async (req, res) => {
+  try {
+    const application = await Application.findById(req.params.id);
+
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    if (application.applicant.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized to withdraw this application" });
+    }
+
+    const jobId = application.job;
+
+    // Delete application first, then update count
+    // This ensures count stays consistent even if the decrement fails
+    await Application.findByIdAndDelete(req.params.id);
+
+    // Decrement job applications count (non-critical operation)
+    await Job.findByIdAndUpdate(jobId, { $inc: { applicationsCount: -1 } });
+
+    res.json({ message: "Application withdrawn successfully" });
+  } catch (error) {
+    console.error("Withdraw application error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+module.exports = router;
