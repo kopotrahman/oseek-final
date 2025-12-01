@@ -1,4 +1,4 @@
-import { LogOut } from "lucide-react";
+import { LogOut, Briefcase } from "lucide-react";
 import { useSyncExternalStore, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -25,7 +25,7 @@ export default function Header() {
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem("token");
-    localStorage.removeItem("userRole");
+    localStorage.removeItem("user");
     window.dispatchEvent(new Event("storage"));
     navigate("/");
   }, [navigate]);
@@ -41,6 +41,13 @@ export default function Header() {
         </div>
 
         <nav className="flex items-center gap-8">
+          <button
+            onClick={() => navigate("/jobs")}
+            className="flex items-center gap-2 text-text-secondary hover:text-text transition"
+          >
+            <Briefcase className="w-4 h-4" />
+            Jobs
+          </button>
           {token ? (
             <>
               <button
