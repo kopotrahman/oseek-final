@@ -66,7 +66,8 @@ export default function Signup() {
       } else {
         setError(data.message || "Signup failed. Please try again.")
       }
-    } catch {
+    } catch (error) {
+      console.error("Signup error:", error)
       setError("Network error. Please try again later.")
     } finally {
       setLoading(false)

@@ -40,7 +40,8 @@ export default function Login() {
       } else {
         setError(data.message || "Login failed. Please check your credentials.")
       }
-    } catch {
+    } catch (error) {
+      console.error("Login error:", error)
       setError("Network error. Please try again later.")
     } finally {
       setLoading(false)
