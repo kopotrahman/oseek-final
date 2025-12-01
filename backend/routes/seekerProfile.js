@@ -325,16 +325,20 @@ router.put("/experience/:id", auth, authorize("seeker"), async (req, res) => {
     const { id } = req.params;
     const { title, company, duration, description } = req.body;
 
+    // Build update object with only provided fields
+    const updateFields = {};
+    if (title !== undefined) updateFields["experience.$.title"] = title;
+    if (company !== undefined) updateFields["experience.$.company"] = company;
+    if (duration !== undefined) updateFields["experience.$.duration"] = duration;
+    if (description !== undefined) updateFields["experience.$.description"] = description;
+
+    if (Object.keys(updateFields).length === 0) {
+      return res.status(400).json({ message: "No fields to update" });
+    }
+
     const profile = await JobSeekerProfile.findOneAndUpdate(
       { user: req.user._id, "experience._id": id },
-      {
-        $set: {
-          "experience.$.title": title,
-          "experience.$.company": company,
-          "experience.$.duration": duration,
-          "experience.$.description": description,
-        },
-      },
+      { $set: updateFields },
       { new: true }
     );
 
@@ -458,15 +462,19 @@ router.put("/education/:id", auth, authorize("seeker"), async (req, res) => {
     const { id } = req.params;
     const { school, degree, year } = req.body;
 
+    // Build update object with only provided fields
+    const updateFields = {};
+    if (school !== undefined) updateFields["education.$.school"] = school;
+    if (degree !== undefined) updateFields["education.$.degree"] = degree;
+    if (year !== undefined) updateFields["education.$.year"] = year;
+
+    if (Object.keys(updateFields).length === 0) {
+      return res.status(400).json({ message: "No fields to update" });
+    }
+
     const profile = await JobSeekerProfile.findOneAndUpdate(
       { user: req.user._id, "education._id": id },
-      {
-        $set: {
-          "education.$.school": school,
-          "education.$.degree": degree,
-          "education.$.year": year,
-        },
-      },
+      { $set: updateFields },
       { new: true }
     );
 

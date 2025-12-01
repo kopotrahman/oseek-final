@@ -318,10 +318,14 @@ router.delete("/:id", auth, authorize("seeker"), async (req, res) => {
       return res.status(403).json({ message: "Not authorized to withdraw this application" });
     }
 
-    // Decrement job applications count
-    await Job.findByIdAndUpdate(application.job, { $inc: { applicationsCount: -1 } });
+    const jobId = application.job;
 
+    // Delete application first, then update count
+    // This ensures count stays consistent even if the decrement fails
     await Application.findByIdAndDelete(req.params.id);
+
+    // Decrement job applications count (non-critical operation)
+    await Job.findByIdAndUpdate(jobId, { $inc: { applicationsCount: -1 } });
 
     res.json({ message: "Application withdrawn successfully" });
   } catch (error) {

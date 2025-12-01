@@ -384,10 +384,10 @@ router.delete("/:id", auth, authorize("company"), async (req, res) => {
       return res.status(403).json({ message: "Not authorized to delete this job" });
     }
 
-    await Job.findByIdAndDelete(req.params.id);
-
-    // Also delete related applications
+    // Delete applications first, then delete the job
+    // This order ensures we don't have orphaned references
     await Application.deleteMany({ job: req.params.id });
+    await Job.findByIdAndDelete(req.params.id);
 
     res.json({ message: "Job deleted successfully" });
   } catch (error) {

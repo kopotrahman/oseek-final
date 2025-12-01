@@ -1,7 +1,16 @@
 const jwt = require("jsonwebtoken");
 const { User } = require("../models");
 
-const JWT_SECRET = process.env.JWT_SECRET || "oseek-jwt-secret-key-2024";
+// Get JWT secret from environment, fail in production if not set
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error("JWT_SECRET environment variable is required in production");
+  }
+  return secret || "oseek-jwt-dev-secret-key-not-for-production";
+};
+
+const JWT_SECRET = getJwtSecret();
 
 const auth = async (req, res, next) => {
   try {
