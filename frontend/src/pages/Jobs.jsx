@@ -10,18 +10,19 @@ export default function Jobs() {
   const [error, setError] = useState("")
   const [applying, setApplying] = useState(null)
   const [applySuccess, setApplySuccess] = useState("")
-  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
+  const [page, setPage] = useState(1)
+  const [paginationInfo, setPaginationInfo] = useState({ pages: 1, total: 0 })
 
   const user = JSON.parse(localStorage.getItem("user") || "null")
   const isSeeker = user?.role === "seeker"
 
-  const fetchJobs = useCallback(async (searchQuery = "") => {
+  const fetchJobs = useCallback(async (searchQuery, currentPage) => {
     setLoading(true)
     setError("")
     try {
       const url = new URL(API_ENDPOINTS.jobs.list)
       if (searchQuery) url.searchParams.append("q", searchQuery)
-      url.searchParams.append("page", pagination.page)
+      url.searchParams.append("page", currentPage)
       url.searchParams.append("limit", 10)
 
       const response = await fetch(url.toString())
@@ -29,7 +30,7 @@ export default function Jobs() {
 
       if (response.ok) {
         setJobs(data.jobs || [])
-        setPagination(data.pagination || { page: 1, pages: 1, total: 0 })
+        setPaginationInfo({ pages: data.pagination?.pages || 1, total: data.pagination?.total || 0 })
       } else {
         setError(data.message || "Failed to fetch jobs")
       }
@@ -39,11 +40,11 @@ export default function Jobs() {
     } finally {
       setLoading(false)
     }
-  }, [pagination.page])
+  }, [])
 
   useEffect(() => {
-    fetchJobs(q)
-  }, [fetchJobs, q])
+    fetchJobs(q, page)
+  }, [fetchJobs, q, page])
 
   const handleApply = async (jobId) => {
     if (!user) {
@@ -81,6 +82,18 @@ export default function Jobs() {
     }
   }
 
+  const handlePrevPage = () => {
+    if (page > 1) {
+      setPage(page - 1)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (page < paginationInfo.pages) {
+      setPage(page + 1)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0f0f1e] via-[#1a1a2e] to-[#0f0f1e]">
       <Header />
@@ -91,7 +104,10 @@ export default function Jobs() {
         <div className="mb-8">
           <input
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              setQ(e.target.value)
+              setPage(1) // Reset to first page on search
+            }}
             placeholder="Search jobs, companies, or locations"
             className="w-full max-w-xl px-4 py-3 rounded-lg bg-[#16213e] border border-[#2d2d4d] text-[#e0e0ff] placeholder-[#9aa1b3] focus:outline-none focus:border-[#0066ff]"
           />
@@ -168,21 +184,21 @@ export default function Jobs() {
           </div>
         )}
 
-        {pagination.pages > 1 && (
+        {paginationInfo.pages > 1 && (
           <div className="flex justify-center gap-2 mt-8">
             <button
-              onClick={() => setPagination({ ...pagination, page: Math.max(1, pagination.page - 1) })}
-              disabled={pagination.page === 1}
+              onClick={handlePrevPage}
+              disabled={page === 1}
               className="px-4 py-2 bg-[#16213e] border border-[#2d2d4d] text-[#e0e0ff] rounded-lg disabled:opacity-50"
             >
               Previous
             </button>
             <span className="px-4 py-2 text-[#a0a0c0]">
-              Page {pagination.page} of {pagination.pages}
+              Page {page} of {paginationInfo.pages}
             </span>
             <button
-              onClick={() => setPagination({ ...pagination, page: Math.min(pagination.pages, pagination.page + 1) })}
-              disabled={pagination.page === pagination.pages}
+              onClick={handleNextPage}
+              disabled={page === paginationInfo.pages}
               className="px-4 py-2 bg-[#16213e] border border-[#2d2d4d] text-[#e0e0ff] rounded-lg disabled:opacity-50"
             >
               Next
