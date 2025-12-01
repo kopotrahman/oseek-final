@@ -1,71 +1,307 @@
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import Header from "../../components/Header"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2, Edit2, Save, X } from "lucide-react"
+import { API_ENDPOINTS, getAuthHeaders } from "../../config/api"
 
 export default function JobSeekerProfile() {
-  const [profile, setProfile] = useState({
-    fullName: "John Doe",
-    email: "john@example.com",
-    phone: "+1 (555) 123-4567",
-    location: "San Francisco, CA",
-    headline: "Full Stack Developer",
-    bio: "Passionate about building scalable web applications",
-    skills: ["React", "Node.js", "MongoDB", "TailwindCSS"],
-    experience: [
-      {
-        id: 1,
-        title: "Senior Developer",
-        company: "Tech Corp",
-        duration: "2021 - Present",
-        description: "Led development of multiple projects",
-      },
-    ],
-    education: [
-      {
-        id: 1,
-        school: "University of Tech",
-        degree: "BS Computer Science",
-        year: "2019",
-      },
-    ],
-  })
-
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const [newSkill, setNewSkill] = useState("")
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [editForm, setEditForm] = useState({})
+  
+  // Experience form states
+  const [showExpForm, setShowExpForm] = useState(false)
+  const [expForm, setExpForm] = useState({ title: "", company: "", duration: "", description: "" })
+  const [editingExpId, setEditingExpId] = useState(null)
+  
+  // Education form states
+  const [showEduForm, setShowEduForm] = useState(false)
+  const [eduForm, setEduForm] = useState({ school: "", degree: "", year: "" })
+  const [editingEduId, setEditingEduId] = useState(null)
+  
+  // Ref for timeout cleanup
+  const timeoutRef = useRef(null)
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
+  }, [])
+  
+  // Helper to set success with auto-clear
+  const showSuccess = (message) => {
+    setSuccess(message)
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    timeoutRef.current = setTimeout(() => setSuccess(""), 3000)
+  }
 
-  const addSkill = () => {
-    if (newSkill.trim()) {
-      setProfile({
-        ...profile,
-        skills: [...profile.skills, newSkill],
+  useEffect(() => {
+    fetchProfile()
+  }, [])
+
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.profile.seeker.get, {
+        headers: getAuthHeaders(),
       })
-      setNewSkill("")
+      const data = await response.json()
+
+      if (response.ok) {
+        setProfile(data)
+        setEditForm({
+          fullName: data.fullName || "",
+          phone: data.phone || "",
+          location: data.location || "",
+          headline: data.headline || "",
+          bio: data.bio || "",
+        })
+      } else {
+        setError(data.message || "Failed to fetch profile")
+      }
+    } catch (err) {
+      console.error("Fetch profile error:", err)
+      setError("Network error. Please try again later.")
+    } finally {
+      setLoading(false)
     }
   }
 
-  const removeSkill = (index) => {
-    setProfile({
-      ...profile,
-      skills: profile.skills.filter((_, i) => i !== index),
-    })
+  const saveProfile = async () => {
+    setSaving(true)
+    setError("")
+    try {
+      const response = await fetch(API_ENDPOINTS.profile.seeker.update, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(editForm),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setProfile(data)
+        setEditingProfile(false)
+        showSuccess("Profile updated successfully!")
+      } else {
+        setError(data.message || "Failed to update profile")
+      }
+    } catch (err) {
+      console.error("Update profile error:", err)
+      setError("Network error. Please try again later.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const addSkill = async () => {
+    if (!newSkill.trim()) return
+    
+    try {
+      const response = await fetch(API_ENDPOINTS.profile.seeker.addSkill, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ skill: newSkill.trim() }),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setProfile(data)
+        setNewSkill("")
+        showSuccess("Skill added!")
+      } else {
+        setError(data.message || `Failed to add skill "${newSkill}"`)
+      }
+    } catch (err) {
+      console.error("Add skill error:", err)
+      setError("Network error. Please try again later.")
+    }
+  }
+
+  const removeSkill = async (skill) => {
+    try {
+      const response = await fetch(API_ENDPOINTS.profile.seeker.removeSkill(skill), {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setProfile(data)
+        showSuccess("Skill removed!")
+      } else {
+        setError(data.message || "Failed to remove skill")
+      }
+    } catch (err) {
+      console.error("Remove skill error:", err)
+      setError("Network error. Please try again later.")
+    }
+  }
+
+  const addExperience = async () => {
+    if (!expForm.title?.trim() || !expForm.company?.trim() || !expForm.duration?.trim()) {
+      setError("Title, company, and duration are required")
+      return
+    }
+
+    try {
+      const response = await fetch(API_ENDPOINTS.profile.seeker.addExperience, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(expForm),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setProfile(data)
+        setExpForm({ title: "", company: "", duration: "", description: "" })
+        setShowExpForm(false)
+        showSuccess("Experience added!")
+      } else {
+        setError(data.message || "Failed to add experience")
+      }
+    } catch (err) {
+      console.error("Add experience error:", err)
+      setError("Network error. Please try again later.")
+    }
+  }
+
+  const updateExperience = async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.profile.seeker.updateExperience(editingExpId), {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(expForm),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setProfile(data)
+        setExpForm({ title: "", company: "", duration: "", description: "" })
+        setEditingExpId(null)
+        showSuccess("Experience updated!")
+      } else {
+        setError(data.message || "Failed to update experience")
+      }
+    } catch (err) {
+      console.error("Update experience error:", err)
+      setError("Network error. Please try again later.")
+    }
+  }
+
+  const deleteExperience = async (id) => {
+    try {
+      const response = await fetch(API_ENDPOINTS.profile.seeker.deleteExperience(id), {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setProfile(data)
+        showSuccess("Experience deleted!")
+      } else {
+        setError(data.message || "Failed to delete experience")
+      }
+    } catch (err) {
+      console.error("Delete experience error:", err)
+      setError("Network error. Please try again later.")
+    }
+  }
+
+  const addEducation = async () => {
+    if (!eduForm.school?.trim() || !eduForm.degree?.trim() || !eduForm.year?.trim()) {
+      setError("School, degree, and year are required")
+      return
+    }
+
+    try {
+      const response = await fetch(API_ENDPOINTS.profile.seeker.addEducation, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(eduForm),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setProfile(data)
+        setEduForm({ school: "", degree: "", year: "" })
+        setShowEduForm(false)
+        showSuccess("Education added!")
+      } else {
+        setError(data.message || "Failed to add education")
+      }
+    } catch (err) {
+      console.error("Add education error:", err)
+      setError("Network error. Please try again later.")
+    }
+  }
+
+  const updateEducation = async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.profile.seeker.updateEducation(editingEduId), {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(eduForm),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setProfile(data)
+        setEduForm({ school: "", degree: "", year: "" })
+        setEditingEduId(null)
+        showSuccess("Education updated!")
+      } else {
+        setError(data.message || "Failed to update education")
+      }
+    } catch (err) {
+      console.error("Update education error:", err)
+      setError("Network error. Please try again later.")
+    }
+  }
+
+  const deleteEducation = async (id) => {
+    try {
+      const response = await fetch(API_ENDPOINTS.profile.seeker.deleteEducation(id), {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setProfile(data)
+        showSuccess("Education deleted!")
+      } else {
+        setError(data.message || "Failed to delete education")
+      }
+    } catch (err) {
+      console.error("Delete education error:", err)
+      setError("Network error. Please try again later.")
+    }
   }
 
   const downloadCV = () => {
+    if (!profile) return
+    
     const cvContent = `
 ${profile.fullName}
-${profile.headline}
-${profile.email} | ${profile.phone} | ${profile.location}
+${profile.headline || ""}
+${profile.email} | ${profile.phone || ""} | ${profile.location || ""}
 
 PROFESSIONAL SUMMARY
-${profile.bio}
+${profile.bio || ""}
 
 SKILLS
-${profile.skills.join(", ")}
+${(profile.skills || []).join(", ")}
 
 EXPERIENCE
-${profile.experience.map((exp) => `${exp.title} at ${exp.company} (${exp.duration})\n${exp.description}`).join("\n\n")}
+${(profile.experience || []).map((exp) => `${exp.title} at ${exp.company} (${exp.duration})\n${exp.description || ""}`).join("\n\n")}
 
 EDUCATION
-${profile.education.map((edu) => `${edu.degree} from ${edu.school} (${edu.year})`).join("\n")}
+${(profile.education || []).map((edu) => `${edu.degree} from ${edu.school} (${edu.year})`).join("\n")}
 `
     const blob = new Blob([cvContent], { type: "text/plain" })
     const url = window.URL.createObjectURL(blob)
@@ -75,10 +311,32 @@ ${profile.education.map((edu) => `${edu.degree} from ${edu.school} (${edu.year})
     a.click()
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#0f0f1e] via-[#1a1a2e] to-[#0f0f1e]">
+        <Header />
+        <div className="flex justify-center py-24">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#0066ff]"></div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0f0f1e] via-[#1a1a2e] to-[#0f0f1e]">
       <Header />
       <div className="max-w-4xl mx-auto py-12 px-4">
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="mb-4 p-3 bg-green-500/10 border border-green-500/50 rounded-lg text-green-400 text-sm">
+            {success}
+          </div>
+        )}
+
         <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 neon-glow">
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-4xl font-bold text-[#e0e0ff]">My Profile</h1>
@@ -92,26 +350,119 @@ ${profile.education.map((edu) => `${edu.degree} from ${edu.school} (${edu.year})
 
           {/* Personal Info */}
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-[#e0e0ff] mb-4">Personal Information</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-[#e0e0ff]">Personal Information</h2>
+              {!editingProfile ? (
+                <button
+                  onClick={() => setEditingProfile(true)}
+                  className="flex items-center gap-2 text-[#0066ff] hover:text-[#00d9ff]"
+                >
+                  <Edit2 size={18} /> Edit
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveProfile}
+                    disabled={saving}
+                    className="flex items-center gap-2 px-4 py-1 bg-[#0066ff] text-white rounded-lg hover:bg-[#0052cc] disabled:opacity-50"
+                  >
+                    <Save size={18} /> {saving ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingProfile(false)
+                      setEditForm({
+                        fullName: profile?.fullName || "",
+                        phone: profile?.phone || "",
+                        location: profile?.location || "",
+                        headline: profile?.headline || "",
+                        bio: profile?.bio || "",
+                      })
+                    }}
+                    className="flex items-center gap-2 px-4 py-1 border border-[#2d2d4d] text-[#e0e0ff] rounded-lg hover:border-[#0066ff]"
+                  >
+                    <X size={18} /> Cancel
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="bg-[#0f0f1e] rounded-lg p-6 space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[#a0a0c0] text-sm font-medium">Full Name</label>
-                  <p className="text-[#e0e0ff] text-lg">{profile.fullName}</p>
+              {editingProfile ? (
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Full Name</label>
+                    <input
+                      type="text"
+                      value={editForm.fullName}
+                      onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+                      className="w-full mt-1 bg-[#16213e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Headline</label>
+                    <input
+                      type="text"
+                      value={editForm.headline}
+                      onChange={(e) => setEditForm({ ...editForm, headline: e.target.value })}
+                      className="w-full mt-1 bg-[#16213e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Phone</label>
+                    <input
+                      type="text"
+                      value={editForm.phone}
+                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                      className="w-full mt-1 bg-[#16213e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Location</label>
+                    <input
+                      type="text"
+                      value={editForm.location}
+                      onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                      className="w-full mt-1 bg-[#16213e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-[#a0a0c0] text-sm font-medium">Bio</label>
+                    <textarea
+                      value={editForm.bio}
+                      onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                      rows={3}
+                      className="w-full mt-1 bg-[#16213e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[#a0a0c0] text-sm font-medium">Headline</label>
-                  <p className="text-[#e0e0ff] text-lg">{profile.headline}</p>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Full Name</label>
+                    <p className="text-[#e0e0ff] text-lg">{profile?.fullName || "Not set"}</p>
+                  </div>
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Headline</label>
+                    <p className="text-[#e0e0ff] text-lg">{profile?.headline || "Not set"}</p>
+                  </div>
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Email</label>
+                    <p className="text-[#e0e0ff] text-lg">{profile?.email || "Not set"}</p>
+                  </div>
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Phone</label>
+                    <p className="text-[#e0e0ff] text-lg">{profile?.phone || "Not set"}</p>
+                  </div>
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Location</label>
+                    <p className="text-[#e0e0ff] text-lg">{profile?.location || "Not set"}</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-[#a0a0c0] text-sm font-medium">Bio</label>
+                    <p className="text-[#e0e0ff]">{profile?.bio || "Not set"}</p>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[#a0a0c0] text-sm font-medium">Email</label>
-                  <p className="text-[#e0e0ff] text-lg">{profile.email}</p>
-                </div>
-                <div>
-                  <label className="text-[#a0a0c0] text-sm font-medium">Location</label>
-                  <p className="text-[#e0e0ff] text-lg">{profile.location}</p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -120,10 +471,10 @@ ${profile.education.map((edu) => `${edu.degree} from ${edu.school} (${edu.year})
             <h2 className="text-2xl font-bold text-[#e0e0ff] mb-4">Skills</h2>
             <div className="bg-[#0f0f1e] rounded-lg p-6">
               <div className="flex flex-wrap gap-2 mb-4">
-                {profile.skills.map((skill, idx) => (
+                {(profile?.skills || []).map((skill, idx) => (
                   <div key={idx} className="bg-[#0066ff] text-white px-4 py-2 rounded-full flex items-center gap-2">
                     {skill}
-                    <button onClick={() => removeSkill(idx)} className="hover:text-[#00d9ff]">
+                    <button onClick={() => removeSkill(skill)} className="hover:text-[#00d9ff]">
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -134,6 +485,7 @@ ${profile.education.map((edu) => `${edu.degree} from ${edu.school} (${edu.year})
                   type="text"
                   value={newSkill}
                   onChange={(e) => setNewSkill(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && addSkill()}
                   placeholder="Add a skill"
                   className="flex-1 bg-[#16213e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] placeholder-[#6d6d8f] focus:border-[#0066ff] focus:outline-none"
                 />
@@ -149,30 +501,229 @@ ${profile.education.map((edu) => `${edu.degree} from ${edu.school} (${edu.year})
 
           {/* Experience */}
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-[#e0e0ff] mb-4">Experience</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-[#e0e0ff]">Experience</h2>
+              <button
+                onClick={() => {
+                  setShowExpForm(true)
+                  setEditingExpId(null)
+                  setExpForm({ title: "", company: "", duration: "", description: "" })
+                }}
+                className="flex items-center gap-2 text-[#0066ff] hover:text-[#00d9ff]"
+              >
+                <Plus size={18} /> Add Experience
+              </button>
+            </div>
+            
+            {(showExpForm || editingExpId) && (
+              <div className="bg-[#0f0f1e] rounded-lg p-6 mb-4 border border-[#0066ff]">
+                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Job Title *</label>
+                    <input
+                      type="text"
+                      value={expForm.title}
+                      onChange={(e) => setExpForm({ ...expForm, title: e.target.value })}
+                      className="w-full mt-1 bg-[#16213e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Company *</label>
+                    <input
+                      type="text"
+                      value={expForm.company}
+                      onChange={(e) => setExpForm({ ...expForm, company: e.target.value })}
+                      className="w-full mt-1 bg-[#16213e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Duration *</label>
+                    <input
+                      type="text"
+                      value={expForm.duration}
+                      onChange={(e) => setExpForm({ ...expForm, duration: e.target.value })}
+                      placeholder="e.g., 2021 - Present"
+                      className="w-full mt-1 bg-[#16213e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] placeholder-[#6d6d8f] focus:border-[#0066ff] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Description</label>
+                    <input
+                      type="text"
+                      value={expForm.description}
+                      onChange={(e) => setExpForm({ ...expForm, description: e.target.value })}
+                      className="w-full mt-1 bg-[#16213e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={editingExpId ? updateExperience : addExperience}
+                    className="px-4 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition"
+                  >
+                    {editingExpId ? "Update" : "Add"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowExpForm(false)
+                      setEditingExpId(null)
+                      setExpForm({ title: "", company: "", duration: "", description: "" })
+                    }}
+                    className="px-4 py-2 border border-[#2d2d4d] text-[#e0e0ff] rounded-lg hover:border-[#0066ff] transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            
             <div className="space-y-4">
-              {profile.experience.map((exp) => (
-                <div key={exp.id} className="bg-[#0f0f1e] rounded-lg p-6 border border-[#2d2d4d]">
-                  <h3 className="text-xl font-bold text-[#e0e0ff]">{exp.title}</h3>
-                  <p className="text-[#00d9ff]">{exp.company}</p>
-                  <p className="text-[#a0a0c0] text-sm">{exp.duration}</p>
-                  <p className="text-[#e0e0ff] mt-2">{exp.description}</p>
+              {(profile?.experience || []).map((exp) => (
+                <div key={exp._id} className="bg-[#0f0f1e] rounded-lg p-6 border border-[#2d2d4d]">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-xl font-bold text-[#e0e0ff]">{exp.title}</h3>
+                      <p className="text-[#00d9ff]">{exp.company}</p>
+                      <p className="text-[#a0a0c0] text-sm">{exp.duration}</p>
+                      {exp.description && <p className="text-[#e0e0ff] mt-2">{exp.description}</p>}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingExpId(exp._id)
+                          setExpForm({
+                            title: exp.title,
+                            company: exp.company,
+                            duration: exp.duration,
+                            description: exp.description || "",
+                          })
+                          setShowExpForm(false)
+                        }}
+                        className="text-[#0066ff] hover:text-[#00d9ff]"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button
+                        onClick={() => deleteExperience(exp._id)}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
+              {(!profile?.experience || profile.experience.length === 0) && !showExpForm && (
+                <p className="text-[#a0a0c0] bg-[#0f0f1e] rounded-lg p-6">No experience added yet</p>
+              )}
             </div>
           </div>
 
           {/* Education */}
           <div>
-            <h2 className="text-2xl font-bold text-[#e0e0ff] mb-4">Education</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-[#e0e0ff]">Education</h2>
+              <button
+                onClick={() => {
+                  setShowEduForm(true)
+                  setEditingEduId(null)
+                  setEduForm({ school: "", degree: "", year: "" })
+                }}
+                className="flex items-center gap-2 text-[#0066ff] hover:text-[#00d9ff]"
+              >
+                <Plus size={18} /> Add Education
+              </button>
+            </div>
+            
+            {(showEduForm || editingEduId) && (
+              <div className="bg-[#0f0f1e] rounded-lg p-6 mb-4 border border-[#0066ff]">
+                <div className="grid md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">School *</label>
+                    <input
+                      type="text"
+                      value={eduForm.school}
+                      onChange={(e) => setEduForm({ ...eduForm, school: e.target.value })}
+                      className="w-full mt-1 bg-[#16213e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Degree *</label>
+                    <input
+                      type="text"
+                      value={eduForm.degree}
+                      onChange={(e) => setEduForm({ ...eduForm, degree: e.target.value })}
+                      className="w-full mt-1 bg-[#16213e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[#a0a0c0] text-sm font-medium">Year *</label>
+                    <input
+                      type="text"
+                      value={eduForm.year}
+                      onChange={(e) => setEduForm({ ...eduForm, year: e.target.value })}
+                      className="w-full mt-1 bg-[#16213e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={editingEduId ? updateEducation : addEducation}
+                    className="px-4 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition"
+                  >
+                    {editingEduId ? "Update" : "Add"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowEduForm(false)
+                      setEditingEduId(null)
+                      setEduForm({ school: "", degree: "", year: "" })
+                    }}
+                    className="px-4 py-2 border border-[#2d2d4d] text-[#e0e0ff] rounded-lg hover:border-[#0066ff] transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            
             <div className="space-y-4">
-              {profile.education.map((edu) => (
-                <div key={edu.id} className="bg-[#0f0f1e] rounded-lg p-6 border border-[#2d2d4d]">
-                  <h3 className="text-xl font-bold text-[#e0e0ff]">{edu.degree}</h3>
-                  <p className="text-[#00d9ff]">{edu.school}</p>
-                  <p className="text-[#a0a0c0] text-sm">{edu.year}</p>
+              {(profile?.education || []).map((edu) => (
+                <div key={edu._id} className="bg-[#0f0f1e] rounded-lg p-6 border border-[#2d2d4d]">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-xl font-bold text-[#e0e0ff]">{edu.degree}</h3>
+                      <p className="text-[#00d9ff]">{edu.school}</p>
+                      <p className="text-[#a0a0c0] text-sm">{edu.year}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingEduId(edu._id)
+                          setEduForm({
+                            school: edu.school,
+                            degree: edu.degree,
+                            year: edu.year,
+                          })
+                          setShowEduForm(false)
+                        }}
+                        className="text-[#0066ff] hover:text-[#00d9ff]"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button
+                        onClick={() => deleteEducation(edu._id)}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
+              {(!profile?.education || profile.education.length === 0) && !showEduForm && (
+                <p className="text-[#a0a0c0] bg-[#0f0f1e] rounded-lg p-6">No education added yet</p>
+              )}
             </div>
           </div>
         </div>
