@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Menu, X, LogOut, Home, Briefcase, User, Settings } from "lucide-react";
 import Header from "./Header";

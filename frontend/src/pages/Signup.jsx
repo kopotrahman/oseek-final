@@ -1,9 +1,8 @@
-"use client"
-
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Eye, EyeOff, Mail, Github } from "lucide-react"
 import Header from "../components/Header"
+import { API_ENDPOINTS } from "../config/api"
 
 export default function Signup() {
   const navigate = useNavigate()
@@ -16,6 +15,7 @@ export default function Signup() {
   })
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
   const role = searchParams.get("role") || "seeker"
 
@@ -28,14 +28,26 @@ export default function Signup() {
 
   const handleSignup = async (e) => {
     e.preventDefault()
+    setError("")
+
+    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+      setError("Please fill in all fields")
+      return
+    }
+
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match")
+      setError("Passwords do not match")
+      return
+    }
+
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters")
       return
     }
 
     setLoading(true)
     try {
-      const response = await fetch("http://localhost:5000/api/auth/signup", {
+      const response = await fetch(API_ENDPOINTS.auth.signup, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -49,10 +61,13 @@ export default function Signup() {
       if (response.ok) {
         localStorage.setItem("token", data.token)
         localStorage.setItem("user", JSON.stringify(data.user))
+        window.dispatchEvent(new Event("storage"))
         navigate(role === "seeker" ? "/profile/seeker" : "/profile/company")
+      } else {
+        setError(data.message || "Signup failed. Please try again.")
       }
-    } catch (error) {
-      console.error("Signup error:", error)
+    } catch {
+      setError("Network error. Please try again later.")
     } finally {
       setLoading(false)
     }
@@ -66,6 +81,12 @@ export default function Signup() {
           <h1 className="text-3xl font-bold mb-2 text-[#e0e0ff]">Create Account</h1>
           <p className="text-[#a0a0c0] mb-8">Join as a {role === "seeker" ? "job seeker" : "company"}</p>
 
+          {error && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSignup} className="space-y-4 mb-6">
             <div>
               <label className="block text-[#a0a0c0] mb-2 font-medium">Full Name</label>
@@ -74,6 +95,7 @@ export default function Signup() {
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
+                required
                 className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] placeholder-[#6d6d8f] focus:border-[#0066ff] focus:outline-none"
                 placeholder="John Doe"
               />
@@ -86,6 +108,7 @@ export default function Signup() {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
+                required
                 className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] placeholder-[#6d6d8f] focus:border-[#0066ff] focus:outline-none"
                 placeholder="your@email.com"
               />
@@ -99,6 +122,8 @@ export default function Signup() {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
+                  required
+                  minLength={6}
                   className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] placeholder-[#6d6d8f] focus:border-[#0066ff] focus:outline-none"
                   placeholder="••••••••"
                 />
@@ -119,6 +144,8 @@ export default function Signup() {
                 name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleChange}
+                required
+                minLength={6}
                 className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] placeholder-[#6d6d8f] focus:border-[#0066ff] focus:outline-none"
                 placeholder="••••••••"
               />
