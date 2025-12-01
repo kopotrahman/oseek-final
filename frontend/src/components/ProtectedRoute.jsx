@@ -2,6 +2,21 @@ import { useState, useEffect } from "react"
 import { Navigate, Outlet } from "react-router-dom"
 import { API_ENDPOINTS, getAuthHeaders } from "../config/api"
 
+// Check if token is likely expired based on JWT structure
+const isTokenExpired = (token) => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    // Check if token has exp claim and if it's expired
+    if (payload.exp) {
+      return Date.now() >= payload.exp * 1000
+    }
+    return false
+  } catch {
+    // If we can't parse the token, consider it invalid
+    return true
+  }
+}
+
 export default function ProtectedRoute() {
   const [loading, setLoading] = useState(true)
   const [isValid, setIsValid] = useState(false)
@@ -33,8 +48,15 @@ export default function ProtectedRoute() {
           setIsValid(false)
         }
       } catch {
-        // Network error - allow access with existing token (offline mode)
-        setIsValid(true)
+        // Network error - check if token appears valid locally
+        // Only allow access if token doesn't appear to be expired
+        if (!isTokenExpired(token)) {
+          setIsValid(true)
+        } else {
+          localStorage.removeItem("token")
+          localStorage.removeItem("user")
+          setIsValid(false)
+        }
       } finally {
         setLoading(false)
       }

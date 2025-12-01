@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Header from "../../components/Header"
 import { API_ENDPOINTS, getAuthHeaders } from "../../config/api"
 
@@ -8,6 +8,16 @@ export default function CompanyProfile() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  
+  // Ref for timeout cleanup
+  const timeoutRef = useRef(null)
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     fetchProfile()
@@ -54,7 +64,8 @@ export default function CompanyProfile() {
       if (response.ok) {
         setProfile(data)
         setSuccess("Profile updated successfully!")
-        setTimeout(() => setSuccess(""), 3000)
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
+        timeoutRef.current = setTimeout(() => setSuccess(""), 3000)
       } else {
         setError(data.message || "Failed to update profile")
       }

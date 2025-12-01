@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Header from "../../components/Header"
 import { Plus, Trash2, Edit2, Save, X } from "lucide-react"
 import { API_ENDPOINTS, getAuthHeaders } from "../../config/api"
@@ -22,6 +22,23 @@ export default function JobSeekerProfile() {
   const [showEduForm, setShowEduForm] = useState(false)
   const [eduForm, setEduForm] = useState({ school: "", degree: "", year: "" })
   const [editingEduId, setEditingEduId] = useState(null)
+  
+  // Ref for timeout cleanup
+  const timeoutRef = useRef(null)
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
+  }, [])
+  
+  // Helper to set success with auto-clear
+  const showSuccess = (message) => {
+    setSuccess(message)
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    timeoutRef.current = setTimeout(() => setSuccess(""), 3000)
+  }
 
   useEffect(() => {
     fetchProfile()
@@ -68,8 +85,7 @@ export default function JobSeekerProfile() {
       if (response.ok) {
         setProfile(data)
         setEditingProfile(false)
-        setSuccess("Profile updated successfully!")
-        setTimeout(() => setSuccess(""), 3000)
+        showSuccess("Profile updated successfully!")
       } else {
         setError(data.message || "Failed to update profile")
       }
@@ -95,10 +111,9 @@ export default function JobSeekerProfile() {
       if (response.ok) {
         setProfile(data)
         setNewSkill("")
-        setSuccess("Skill added!")
-        setTimeout(() => setSuccess(""), 2000)
+        showSuccess("Skill added!")
       } else {
-        setError(data.message || "Failed to add skill")
+        setError(data.message || `Failed to add skill "${newSkill}"`)
       }
     } catch (err) {
       console.error("Add skill error:", err)
@@ -116,8 +131,7 @@ export default function JobSeekerProfile() {
 
       if (response.ok) {
         setProfile(data)
-        setSuccess("Skill removed!")
-        setTimeout(() => setSuccess(""), 2000)
+        showSuccess("Skill removed!")
       } else {
         setError(data.message || "Failed to remove skill")
       }
@@ -128,7 +142,7 @@ export default function JobSeekerProfile() {
   }
 
   const addExperience = async () => {
-    if (!expForm.title || !expForm.company || !expForm.duration) {
+    if (!expForm.title?.trim() || !expForm.company?.trim() || !expForm.duration?.trim()) {
       setError("Title, company, and duration are required")
       return
     }
@@ -145,8 +159,7 @@ export default function JobSeekerProfile() {
         setProfile(data)
         setExpForm({ title: "", company: "", duration: "", description: "" })
         setShowExpForm(false)
-        setSuccess("Experience added!")
-        setTimeout(() => setSuccess(""), 2000)
+        showSuccess("Experience added!")
       } else {
         setError(data.message || "Failed to add experience")
       }
@@ -169,8 +182,7 @@ export default function JobSeekerProfile() {
         setProfile(data)
         setExpForm({ title: "", company: "", duration: "", description: "" })
         setEditingExpId(null)
-        setSuccess("Experience updated!")
-        setTimeout(() => setSuccess(""), 2000)
+        showSuccess("Experience updated!")
       } else {
         setError(data.message || "Failed to update experience")
       }
@@ -190,8 +202,7 @@ export default function JobSeekerProfile() {
 
       if (response.ok) {
         setProfile(data)
-        setSuccess("Experience deleted!")
-        setTimeout(() => setSuccess(""), 2000)
+        showSuccess("Experience deleted!")
       } else {
         setError(data.message || "Failed to delete experience")
       }
@@ -202,7 +213,7 @@ export default function JobSeekerProfile() {
   }
 
   const addEducation = async () => {
-    if (!eduForm.school || !eduForm.degree || !eduForm.year) {
+    if (!eduForm.school?.trim() || !eduForm.degree?.trim() || !eduForm.year?.trim()) {
       setError("School, degree, and year are required")
       return
     }
@@ -219,8 +230,7 @@ export default function JobSeekerProfile() {
         setProfile(data)
         setEduForm({ school: "", degree: "", year: "" })
         setShowEduForm(false)
-        setSuccess("Education added!")
-        setTimeout(() => setSuccess(""), 2000)
+        showSuccess("Education added!")
       } else {
         setError(data.message || "Failed to add education")
       }
@@ -243,8 +253,7 @@ export default function JobSeekerProfile() {
         setProfile(data)
         setEduForm({ school: "", degree: "", year: "" })
         setEditingEduId(null)
-        setSuccess("Education updated!")
-        setTimeout(() => setSuccess(""), 2000)
+        showSuccess("Education updated!")
       } else {
         setError(data.message || "Failed to update education")
       }
@@ -264,8 +273,7 @@ export default function JobSeekerProfile() {
 
       if (response.ok) {
         setProfile(data)
-        setSuccess("Education deleted!")
-        setTimeout(() => setSuccess(""), 2000)
+        showSuccess("Education deleted!")
       } else {
         setError(data.message || "Failed to delete education")
       }

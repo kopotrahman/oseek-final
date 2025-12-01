@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import Header from "../components/Header"
 import { API_ENDPOINTS, getAuthHeaders } from "../config/api"
 import { MapPin, Briefcase, DollarSign, Clock } from "lucide-react"
@@ -12,9 +12,21 @@ export default function Jobs() {
   const [applySuccess, setApplySuccess] = useState("")
   const [page, setPage] = useState(1)
   const [paginationInfo, setPaginationInfo] = useState({ pages: 1, total: 0 })
+  
+  // Refs for timeout cleanup
+  const successTimeoutRef = useRef(null)
+  const errorTimeoutRef = useRef(null)
 
   const user = JSON.parse(localStorage.getItem("user") || "null")
   const isSeeker = user?.role === "seeker"
+  
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current)
+    }
+  }, [])
 
   const fetchJobs = useCallback(async (searchQuery, currentPage) => {
     setLoading(true)
@@ -25,7 +37,7 @@ export default function Jobs() {
       url.searchParams.append("page", currentPage)
       url.searchParams.append("limit", 10)
 
-      const response = await fetch(url.toString())
+      const response = await fetch(url.toString(), { headers: getAuthHeaders() })
       const data = await response.json()
 
       if (response.ok) {
@@ -44,7 +56,7 @@ export default function Jobs() {
 
   useEffect(() => {
     fetchJobs(q, page)
-  }, [fetchJobs, q, page])
+  }, [q, page]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleApply = async (jobId) => {
     if (!user) {
@@ -69,10 +81,12 @@ export default function Jobs() {
 
       if (response.ok) {
         setApplySuccess(`Successfully applied to this job!`)
-        setTimeout(() => setApplySuccess(""), 3000)
+        if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
+        successTimeoutRef.current = setTimeout(() => setApplySuccess(""), 3000)
       } else {
         setError(data.message || "Failed to apply")
-        setTimeout(() => setError(""), 3000)
+        if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current)
+        errorTimeoutRef.current = setTimeout(() => setError(""), 3000)
       }
     } catch (err) {
       console.error("Apply error:", err)
@@ -147,7 +161,7 @@ export default function Jobs() {
                         </span>
                         {job.salary?.min && (
                           <span className="flex items-center gap-1">
-                            <DollarSign size={14} /> {job.salary.min.toLocaleString()} - {job.salary.max?.toLocaleString()} {job.salary.currency || "USD"}
+                            <DollarSign size={14} /> {job.salary?.min?.toLocaleString()} - {job.salary?.max?.toLocaleString()} {job.salary?.currency || "USD"}
                           </span>
                         )}
                         <span className="flex items-center gap-1">

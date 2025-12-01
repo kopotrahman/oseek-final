@@ -152,8 +152,8 @@ export default function Dashboard() {
             {stats?.recentApplications?.length > 0 ? (
               stats.recentApplications.map((app, idx) => (
                 <div key={idx} className="border-l-4 border-[#00d9ff] pl-4">
-                  <p className="text-[#e0e0ff] font-semibold">{app.applicant?.name || "Unknown"}</p>
-                  <p className="text-[#a0a0c0] text-sm">Applied to: {app.job?.title || "Unknown Job"}</p>
+                  <p className="text-[#e0e0ff] font-semibold">{app.applicant?.name ?? "Unknown"}</p>
+                  <p className="text-[#a0a0c0] text-sm">Applied to: {app.job?.title ?? "Unknown Job"}</p>
                   <div className="flex items-center gap-2 text-[#a0a0c0] text-sm mt-1">
                     <Clock size={14} />
                     {new Date(app.createdAt).toLocaleDateString()}
