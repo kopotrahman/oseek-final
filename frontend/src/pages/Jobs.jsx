@@ -1,23 +1,21 @@
-"use client"
-
-import { useState, useEffect } from "react"
+import { useState, useMemo } from "react"
 import Header from "../components/Header"
+
+// Sample job data - replace with API fetch when backend is available
+const SAMPLE_JOBS = [
+  { id: 1, title: "Frontend Engineer", company: "Acme Inc", location: "Remote" },
+  { id: 2, title: "Backend Engineer", company: "Acme Inc", location: "Remote" },
+  { id: 3, title: "Product Designer", company: "Designly", location: "New York, NY" },
+]
 
 export default function Jobs() {
   const [q, setQ] = useState("")
-  const [jobs, setJobs] = useState([])
+  const [jobs] = useState(SAMPLE_JOBS)
 
-  useEffect(() => {
-    // placeholder: fetch jobs from a backend API when available
-    const sample = [
-      { id: 1, title: "Frontend Engineer", company: "Acme Inc", location: "Remote" },
-      { id: 2, title: "Backend Engineer", company: "Acme Inc", location: "Remote" },
-      { id: 3, title: "Product Designer", company: "Designly", location: "New York, NY" },
-    ]
-    setJobs(sample)
-  }, [])
-
-  const filtered = jobs.filter((j) => (q ? (j.title + j.company + j.location).toLowerCase().includes(q.toLowerCase()) : true))
+  const filtered = useMemo(() => 
+    jobs.filter((j) => q ? (j.title + j.company + j.location).toLowerCase().includes(q.toLowerCase()) : true),
+    [jobs, q]
+  )
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0f0f1e] via-[#1a1a2e] to-[#0f0f1e]">

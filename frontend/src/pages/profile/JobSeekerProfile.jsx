@@ -1,5 +1,3 @@
-"use client"
-
 import { useState } from "react"
 import Header from "../../components/Header"
 import { Plus, Trash2 } from "lucide-react"
@@ -33,7 +31,6 @@ export default function JobSeekerProfile() {
   })
 
   const [newSkill, setNewSkill] = useState("")
-  const [editing, setEditing] = useState(false)
 
   const addSkill = () => {
     if (newSkill.trim()) {

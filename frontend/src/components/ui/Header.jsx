@@ -1,25 +1,34 @@
 import { LogOut } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+
+function subscribeToStorage(callback) {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+}
+
+function getTokenSnapshot() {
+  return localStorage.getItem("token");
+}
+
+function getServerSnapshot() {
+  return null;
+}
 
 export default function Header() {
   const navigate = useNavigate();
-  const [token, setToken] = useState(null);
-  const [mounted, setMounted] = useState(false);
+  const token = useSyncExternalStore(
+    subscribeToStorage,
+    getTokenSnapshot,
+    getServerSnapshot
+  );
 
-  useEffect(() => {
-    setMounted(true);
-    setToken(localStorage.getItem("token"));
-  }, []);
-
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem("token");
     localStorage.removeItem("userRole");
-    setToken(null);
+    window.dispatchEvent(new Event("storage"));
     navigate("/");
-  };
-
-  if (!mounted) return null;
+  }, [navigate]);
 
   return (
     <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">

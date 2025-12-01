@@ -1,5 +1,3 @@
-"use client"
-
 import { useNavigate } from "react-router-dom"
 import Header from "../components/Header"
 import { BarChart3, Users, FileText, Settings } from "lucide-react"

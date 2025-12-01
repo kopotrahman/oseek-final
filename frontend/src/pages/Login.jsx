@@ -1,9 +1,8 @@
-"use client"
-
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Eye, EyeOff, Github, Mail } from "lucide-react"
 import Header from "../components/Header"
+import { API_ENDPOINTS } from "../config/api"
 
 export default function Login() {
   const navigate = useNavigate()
@@ -12,14 +11,22 @@ export default function Login() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
   const role = searchParams.get("role") || "seeker"
 
   const handleLogin = async (e) => {
     e.preventDefault()
+    setError("")
+    
+    if (!email || !password) {
+      setError("Please fill in all fields")
+      return
+    }
+
     setLoading(true)
     try {
-      const response = await fetch("http://localhost:5000/api/auth/login", {
+      const response = await fetch(API_ENDPOINTS.auth.login, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, role }),
@@ -28,10 +35,14 @@ export default function Login() {
       if (response.ok) {
         localStorage.setItem("token", data.token)
         localStorage.setItem("user", JSON.stringify(data.user))
+        window.dispatchEvent(new Event("storage"))
         navigate(role === "seeker" ? "/profile/seeker" : "/profile/company")
+      } else {
+        setError(data.message || "Login failed. Please check your credentials.")
       }
     } catch (error) {
       console.error("Login error:", error)
+      setError("Network error. Please try again later.")
     } finally {
       setLoading(false)
     }
@@ -45,6 +56,12 @@ export default function Login() {
           <h1 className="text-3xl font-bold mb-2 text-[#e0e0ff]">Welcome Back</h1>
           <p className="text-[#a0a0c0] mb-8">Sign in to your {role === "seeker" ? "job seeker" : "company"} account</p>
 
+          {error && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-4 mb-6">
             <div>
               <label className="block text-[#a0a0c0] mb-2 font-medium">Email</label>
@@ -52,6 +69,7 @@ export default function Login() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                required
                 className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] placeholder-[#6d6d8f] focus:border-[#0066ff] focus:outline-none"
                 placeholder="your@email.com"
               />
@@ -64,6 +82,7 @@ export default function Login() {
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  required
                   className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] placeholder-[#6d6d8f] focus:border-[#0066ff] focus:outline-none"
                   placeholder="••••••••"
                 />
