@@ -1,7 +1,6 @@
 const jwt = require("jsonwebtoken");
 const { User } = require("../models");
 
-// Get JWT secret from environment, fail in production if not set
 const getJwtSecret = () => {
   const secret = process.env.JWT_SECRET;
   if (!secret && process.env.NODE_ENV === "production") {
@@ -41,7 +40,6 @@ const auth = async (req, res, next) => {
   }
 };
 
-// Role-based authorization middleware
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
@@ -53,7 +51,6 @@ const authorize = (...roles) => {
   };
 };
 
-// Generate JWT token
 const generateToken = (userId) => {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: "7d" });
 };

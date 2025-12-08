@@ -74,7 +74,7 @@ router.post("/", auth, authorize("seeker"), async (req, res) => {
       return res.status(400).json({ message: "Job ID is required" });
     }
 
-    // Check if job exists and is open
+    
     const job = await Job.findById(jobId);
     if (!job) {
       return res.status(404).json({ message: "Job not found" });
@@ -84,7 +84,7 @@ router.post("/", auth, authorize("seeker"), async (req, res) => {
       return res.status(400).json({ message: "This job is no longer accepting applications" });
     }
 
-    // Check if already applied
+    
     const existingApplication = await Application.findOne({
       job: jobId,
       applicant: req.user._id,
@@ -94,7 +94,7 @@ router.post("/", auth, authorize("seeker"), async (req, res) => {
       return res.status(400).json({ message: "You have already applied for this job" });
     }
 
-    // Get seeker's resume if not provided
+    
     let resumeUrlToSave = resumeUrl;
     if (!resumeUrlToSave) {
       const profile = await JobSeekerProfile.findOne({ user: req.user._id });
@@ -110,7 +110,7 @@ router.post("/", auth, authorize("seeker"), async (req, res) => {
 
     await application.save();
 
-    // Update job applications count
+    
     await Job.findByIdAndUpdate(jobId, { $inc: { applicationsCount: 1 } });
 
     res.status(201).json(application);
@@ -345,11 +345,8 @@ router.delete("/:id", auth, authorize("seeker"), async (req, res) => {
 
     const jobId = application.job;
 
-    // Delete application first, then update count
-    // This ensures count stays consistent even if the decrement fails
     await Application.findByIdAndDelete(req.params.id);
 
-    // Decrement job applications count (non-critical operation)
     await Job.findByIdAndUpdate(jobId, { $inc: { applicationsCount: -1 } });
 
     res.json({ message: "Application withdrawn successfully" });

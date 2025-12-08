@@ -3,7 +3,7 @@ const router = express.Router();
 const { Job, Application, CompanyProfile } = require("../models");
 const { auth, authorize } = require("../middleware");
 
-// Helper function to escape regex special characters to prevent ReDoS
+
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
@@ -142,12 +142,12 @@ const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 router.get("/", async (req, res) => {
   try {
     const { q, type, location } = req.query;
-    // Validate page and limit parameters
+    
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
     const query = { status: "open" };
 
-    // Search query with escaped regex to prevent ReDoS
+    
     if (q) {
       const escapedQ = escapeRegex(q);
       query.$or = [
@@ -157,12 +157,12 @@ router.get("/", async (req, res) => {
       ];
     }
 
-    // Type filter
+    
     if (type) {
       query.type = type;
     }
 
-    // Location filter with escaped regex to prevent ReDoS
+
     if (location) {
       const escapedLocation = escapeRegex(location);
       query.location = { $regex: escapedLocation, $options: "i" };
@@ -171,7 +171,7 @@ router.get("/", async (req, res) => {
     const skip = (page - 1) * limit;
     const total = await Job.countDocuments(query);
 
-    // Use aggregation with $lookup to avoid N+1 query problem
+   
     const jobsWithCompanyInfo = await Job.aggregate([
       { $match: query },
       { $sort: { createdAt: -1 } },
@@ -195,11 +195,10 @@ router.get("/", async (req, res) => {
       }
     ]);
 
-    // Flatten companyProfile and companyUser arrays, and set companyName/companyLogo
+    
     const jobsWithCompanyInfoMapped = jobsWithCompanyInfo.map(job => {
       const companyProfile = job.companyProfile && job.companyProfile[0];
       const companyUser = job.companyUser && job.companyUser[0];
-      // Remove the lookup arrays from the response
       const { companyProfile: _, companyUser: __, ...jobData } = job;
       return {
         ...jobData,
@@ -439,7 +438,6 @@ router.delete("/:id", auth, authorize("company"), async (req, res) => {
       return res.status(403).json({ message: "Not authorized to delete this job" });
     }
 
-    // Delete related applications first to prevent orphaned application records, then delete the job
     await Application.deleteMany({ job: req.params.id });
     await Job.findByIdAndDelete(req.params.id);
 

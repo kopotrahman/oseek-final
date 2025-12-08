@@ -99,7 +99,6 @@ router.get("/", auth, authorize("seeker"), async (req, res) => {
     let profile = await JobSeekerProfile.findOne({ user: req.user._id });
 
     if (!profile) {
-      // Create profile if it doesn't exist
       profile = await JobSeekerProfile.create({
         user: req.user._id,
         fullName: req.user.name,

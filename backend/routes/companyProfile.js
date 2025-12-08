@@ -59,7 +59,6 @@ router.get("/", auth, authorize("company"), async (req, res) => {
     let profile = await CompanyProfile.findOne({ user: req.user._id });
 
     if (!profile) {
-      // Create profile if it doesn't exist
       profile = await CompanyProfile.create({
         user: req.user._id,
         companyName: req.user.name,

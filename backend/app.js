@@ -55,14 +55,14 @@ app.use("/api/dashboard", dashboardRoutes);
 if (!mongoose.connection.readyState) {
   mongoose
     .connect(process.env.MONGO_URI)
-    .then(() => console.log("✅ MongoDB connected successfully!"))
-    .catch((err) => console.log("❌ MongoDB connection error:", err));
+    .then(() => console.log("MongoDB connected successfully!"))
+    .catch((err) => console.log("MongoDB connection error:", err));
 }
 
 
 app.get("/", (req, res) =>
   res.json({
-    message: "👋 Welcome to OSEEK API! Your dream job awaits!",
+    message: "Welcome to OSEEK API! Your dream job awaits!",
     documentation: "/api/docs",
     endpoints: {
       auth: "/api/auth",

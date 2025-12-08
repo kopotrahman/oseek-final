@@ -100,7 +100,7 @@ router.post("/signup", async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-    // Validate required fields
+    
     if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -109,13 +109,13 @@ router.post("/signup", async (req, res) => {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
-    // Check if user exists
+    
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({ message: "User with this email already exists" });
     }
 
-    // Create user
+    
     const user = new User({
       name,
       email: email.toLowerCase(),
@@ -125,7 +125,7 @@ router.post("/signup", async (req, res) => {
 
     await user.save();
 
-    // Create profile based on role
+    
     if (user.role === "seeker") {
       await JobSeekerProfile.create({
         user: user._id,
@@ -140,7 +140,7 @@ router.post("/signup", async (req, res) => {
       });
     }
 
-    // Generate token
+    
     const token = generateToken(user._id);
 
     res.status(201).json({
@@ -180,31 +180,26 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password, role } = req.body;
 
-    // Validate required fields
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    // Find user
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // Optionally verify role if provided
     if (role && user.role !== role) {
       return res.status(400).json({
         message: `This account is registered as ${user.role}. Please login with correct role.`,
       });
     }
 
-    // Generate token
     const token = generateToken(user._id);
 
     res.json({

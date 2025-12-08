@@ -64,7 +64,6 @@ const { auth } = require("../middleware");
 router.get("/stats", auth, async (req, res) => {
   try {
     if (req.user.role === "seeker") {
-      // Job seeker dashboard
       const profile = await JobSeekerProfile.findOne({ user: req.user._id });
       const applications = await Application.find({ applicant: req.user._id })
         .populate("job", "title")
@@ -82,12 +81,11 @@ router.get("/stats", auth, async (req, res) => {
 
       res.json({
         profileViews: profile?.profileViews || 0,
-        connections: 0, // Placeholder for future feature
+        connections: 0, 
         applications: applicationCount,
         recentActivity,
       });
     } else {
-      // Company dashboard
       const jobs = await Job.find({ company: req.user._id });
       const jobIds = jobs.map((job) => job._id);
 
@@ -170,7 +168,6 @@ router.get("/activity", auth, async (req, res) => {
         });
       });
 
-      // Add job creation activities
       jobs
         .sort((a, b) => b.createdAt - a.createdAt)
         .slice(0, limit)
@@ -184,7 +181,7 @@ router.get("/activity", auth, async (req, res) => {
         });
     }
 
-    // Sort by timestamp
+   
     activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
     res.json(activities.slice(0, limit));
