@@ -1,0 +1,7 @@
+{
+  "name": "oseek-final",
+  "private": true,
+  "dependencies": {
+    "serverless-http": "^3.0.0"
+  }
+}
