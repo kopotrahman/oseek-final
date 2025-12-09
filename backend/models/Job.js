@@ -44,6 +44,11 @@ const jobSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    openings: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
   },
   {
     timestamps: true,

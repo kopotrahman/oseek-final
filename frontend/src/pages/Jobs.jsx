@@ -22,12 +22,15 @@ export default function Jobs() {
     salaryCurrency: "USD",
     skills: "",
     experience: "",
+    openings: "1",
   })
   const [postingJob, setPostingJob] = useState(false)
   const [jobFormError, setJobFormError] = useState("")
   const [jobFormSuccess, setJobFormSuccess] = useState("")
   const [myJobs, setMyJobs] = useState([])
   const [myJobsLoading, setMyJobsLoading] = useState(false)
+  const [expandedJobId, setExpandedJobId] = useState(null)
+  const [jobApplications, setJobApplications] = useState({})
   
   // Refs for timeout cleanup
   const successTimeoutRef = useRef(null)
@@ -101,6 +104,77 @@ export default function Jobs() {
     fetchMyJobs()
   }, [fetchMyJobs])
 
+  const fetchJobApplications = async (jobId) => {
+    setJobApplications((prev) => ({
+      ...prev,
+      [jobId]: { ...(prev[jobId] || {}), loading: true, error: "" },
+    }))
+
+    try {
+      const response = await fetch(API_ENDPOINTS.applications.forJob(jobId), { headers: getAuthHeaders() })
+      const data = await response.json()
+
+      if (response.ok) {
+        setJobApplications((prev) => ({
+          ...prev,
+          [jobId]: { data, loading: false, error: "" },
+        }))
+      } else {
+        setJobApplications((prev) => ({
+          ...prev,
+          [jobId]: { ...(prev[jobId] || {}), loading: false, error: data.message || "Failed to fetch applications" },
+        }))
+      }
+    } catch (err) {
+      console.error("Fetch job applications error:", err)
+      setJobApplications((prev) => ({
+        ...prev,
+        [jobId]: { ...(prev[jobId] || {}), loading: false, error: "Network error. Please try again later." },
+      }))
+    }
+  }
+
+  const toggleApplications = (jobId) => {
+    const isExpanded = expandedJobId === jobId
+    setExpandedJobId(isExpanded ? null : jobId)
+    if (!isExpanded && !jobApplications[jobId]?.data) {
+      fetchJobApplications(jobId)
+    }
+  }
+
+  const updateApplicationStatus = async (applicationId, status, jobId) => {
+    try {
+      const response = await fetch(API_ENDPOINTS.applications.updateStatus(applicationId), {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status }),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setJobApplications((prev) => {
+          const current = prev[jobId]?.data || []
+          const updated = current.map((app) => (app._id === applicationId ? { ...app, status } : app))
+          return {
+            ...prev,
+            [jobId]: { ...(prev[jobId] || {}), data: updated, error: "" },
+          }
+        })
+      } else {
+        setJobApplications((prev) => ({
+          ...prev,
+          [jobId]: { ...(prev[jobId] || {}), error: data.message || "Failed to update status" },
+        }))
+      }
+    } catch (err) {
+      console.error("Update application status error:", err)
+      setJobApplications((prev) => ({
+        ...prev,
+        [jobId]: { ...(prev[jobId] || {}), error: "Network error. Please try again later." },
+      }))
+    }
+  }
+
   const handleApply = async (jobId) => {
     if (!user) {
       window.location.href = "/auth/login?role=seeker"
@@ -171,6 +245,7 @@ export default function Jobs() {
             .map((skill) => skill.trim())
             .filter(Boolean)
         : [],
+      openings: newJob.openings ? Number(newJob.openings) : undefined,
     }
 
     setPostingJob(true)
@@ -194,6 +269,7 @@ export default function Jobs() {
           salaryCurrency: "USD",
           skills: "",
           experience: "",
+          openings: "1",
         })
         fetchMyJobs()
       } else {
@@ -355,6 +431,16 @@ export default function Jobs() {
                     className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
                   />
                 </div>
+                <div>
+                  <label className="block text-[#a0a0c0] mb-2 font-medium">Openings</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newJob.openings}
+                    onChange={(e) => setNewJob({ ...newJob, openings: e.target.value })}
+                    className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div>
@@ -407,6 +493,9 @@ export default function Jobs() {
                           <span className="flex items-center gap-1">
                             <Clock size={14} /> {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Date unavailable"}
                           </span>
+                          <span className="flex items-center gap-1">
+                            Openings: {job.openings ?? 1}
+                          </span>
                         </div>
                       </div>
                       <div className="text-right text-sm text-[#a0a0c0]">
@@ -416,8 +505,81 @@ export default function Jobs() {
                         <p className="mt-1">
                           Applications: <span className="text-[#e0e0ff] font-semibold">{job.applicationsCount ?? 0}</span>
                         </p>
+                        <button
+                          onClick={() => toggleApplications(job._id)}
+                          className="mt-2 px-3 py-1 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition"
+                        >
+                          {expandedJobId === job._id ? "Hide applicants" : "View applicants"}
+                        </button>
                       </div>
                     </div>
+                    {expandedJobId === job._id && (
+                      <div className="mt-4 border-t border-[#2d2d4d] pt-4">
+                        {jobApplications[job._id]?.error && (
+                          <div className="mb-3 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                            {jobApplications[job._id].error}
+                          </div>
+                        )}
+                        {jobApplications[job._id]?.loading ? (
+                          <div className="flex justify-center py-4">
+                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#0066ff]"></div>
+                          </div>
+                        ) : (jobApplications[job._id]?.data || []).length ? (
+                          <div className="space-y-3">
+                            {(jobApplications[job._id]?.data || []).map((application) => (
+                              <div key={application._id} className="bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg p-4">
+                                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+                                  <div>
+                                    <p className="text-[#e0e0ff] font-semibold">{application.applicant?.name || application.applicantProfile?.fullName || "Unknown applicant"}</p>
+                                    <p className="text-[#a0a0c0] text-sm">{application.applicant?.email || application.applicantProfile?.email || "Email unavailable"}</p>
+                                    {application.applicantProfile?.headline && (
+                                      <p className="text-[#a0a0c0] text-sm mt-1">{application.applicantProfile.headline}</p>
+                                    )}
+                                    {application.applicantProfile?.skills?.length > 0 && (
+                                      <div className="flex flex-wrap gap-2 mt-2">
+                                        {application.applicantProfile.skills.slice(0, 5).map((skill, idx) => (
+                                          <span key={idx} className="px-2 py-1 bg-[#0066ff]/20 text-[#0066ff] rounded text-xs">
+                                            {skill}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col gap-2 items-start md:items-end">
+                                    <span className="text-sm text-[#a0a0c0]">
+                                      Status: <span className="text-[#e0e0ff] font-semibold">{application.status}</span>
+                                    </span>
+                                    <div className="flex flex-wrap gap-2">
+                                      {["pending", "reviewing", "shortlisted", "accepted", "rejected"].map((status) => (
+                                        <button
+                                          key={status}
+                                          onClick={() => updateApplicationStatus(application._id, status, job._id)}
+                                          className={`px-3 py-1 rounded-lg text-sm border ${
+                                            application.status === status
+                                              ? "bg-[#0066ff] text-white border-[#0066ff]"
+                                              : "bg-transparent text-[#e0e0ff] border-[#2d2d4d] hover:border-[#0066ff]"
+                                          }`}
+                                        >
+                                          {status}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                                {application.coverLetter && (
+                                  <div className="mt-3 text-sm text-[#cbd5f5]">
+                                    <p className="font-semibold text-[#e0e0ff]">Cover Letter</p>
+                                    <p className="whitespace-pre-wrap">{application.coverLetter}</p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[#a0a0c0]">No applications yet.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -454,6 +616,9 @@ export default function Jobs() {
                         )}
                         <span className="flex items-center gap-1">
                           <Clock size={14} /> {job.experience || "Any experience"}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          Openings: {job.openings ?? 1}
                         </span>
                       </div>
                       {job.skills?.length > 0 && (

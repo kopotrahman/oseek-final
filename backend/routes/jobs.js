@@ -46,6 +46,8 @@ const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  *           enum: [open, closed, paused]
  *         applicationsCount:
  *           type: number
+ *         openings:
+ *           type: number
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -80,6 +82,8 @@ const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  *             type: string
  *         experience:
  *           type: string
+ *         openings:
+ *           type: number
  */
 
 /**
@@ -320,7 +324,7 @@ router.get("/:id", async (req, res) => {
  */
 router.post("/", auth, authorize("company"), async (req, res) => {
   try {
-    const { title, description, location, type, salary, skills, experience } = req.body;
+    const { title, description, location, type, salary, skills, experience, openings } = req.body;
 
     if (!title || !description || !location) {
       return res.status(400).json({ message: "Title, description, and location are required" });
@@ -335,6 +339,7 @@ router.post("/", auth, authorize("company"), async (req, res) => {
       salary,
       skills: skills || [],
       experience: experience || "0-1 years",
+      openings: openings && openings > 0 ? openings : 1,
     });
 
     await job.save();
@@ -387,7 +392,7 @@ router.put("/:id", auth, authorize("company"), async (req, res) => {
     }
 
     const updates = req.body;
-    const allowedUpdates = ["title", "description", "location", "type", "salary", "skills", "experience", "status"];
+    const allowedUpdates = ["title", "description", "location", "type", "salary", "skills", "experience", "status", "openings"];
 
     Object.keys(updates).forEach((key) => {
       if (allowedUpdates.includes(key)) {
