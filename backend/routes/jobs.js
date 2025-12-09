@@ -346,7 +346,7 @@ router.post("/", auth, authorize("company"), async (req, res) => {
 });
 
 // POST: Create a new job posting
-router.post('/', authenticate, async (req, res) => {
+router.post('/', auth,authorize("company"), async (req, res) => {
   try {
     const { title, description, requirements, salary } = req.body;
     const companyId = req.user.id; // Assuming `req.user` contains authenticated company info
@@ -367,7 +367,7 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 // POST: Apply to a job
-router.post('/apply/:jobId', authenticate, async (req, res) => {
+router.post('/apply/:jobId', auth,authorize("seeker"), async (req, res) => {
   try {
     const { jobId } = req.params;
     const userId = req.user.id; // Assuming `req.user` contains authenticated user info
