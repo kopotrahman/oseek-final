@@ -196,7 +196,6 @@ export default function Jobs() {
           experience: "",
         })
         fetchMyJobs()
-        setPage(1)
       } else {
         setJobFormError(data.message || "Failed to post job")
       }
@@ -406,7 +405,7 @@ export default function Jobs() {
                             <Briefcase size={14} /> {job.type}
                           </span>
                           <span className="flex items-center gap-1">
-                            <Clock size={14} /> {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Recently posted"}
+                            <Clock size={14} /> {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Date unavailable"}
                           </span>
                         </div>
                       </div>

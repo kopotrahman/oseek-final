@@ -345,7 +345,6 @@ router.post("/", auth, authorize("company"), async (req, res) => {
   }
 });
 
-// POST: Create a new job posting
 /**
  * @swagger
  * /api/jobs/{id}:
