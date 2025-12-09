@@ -345,6 +345,50 @@ router.post("/", auth, authorize("company"), async (req, res) => {
   }
 });
 
+// POST: Create a new job posting
+router.post('/', authenticate, async (req, res) => {
+  try {
+    const { title, description, requirements, salary } = req.body;
+    const companyId = req.user.id; // Assuming `req.user` contains authenticated company info
+
+    const job = await Job.create({
+      title,
+      description,
+      requirements,
+      salary,
+      company: companyId,
+    });
+
+    res.status(201).json({ message: 'Job created successfully', job });
+  } catch (error) {
+    console.error('Job creation error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST: Apply to a job
+router.post('/apply/:jobId', authenticate, async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const userId = req.user.id; // Assuming `req.user` contains authenticated user info
+
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    const application = await Application.create({
+      job: jobId,
+      user: userId,
+    });
+
+    res.status(201).json({ message: 'Application submitted successfully', application });
+  } catch (error) {
+    console.error('Job application error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 /**
  * @swagger
  * /api/jobs/{id}:
