@@ -669,4 +669,40 @@ router.get("/download-cv", auth, authorize("seeker"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/profile/seeker/{id}:
+ *   get:
+ *     summary: Get public job seeker profile by ID
+ *     tags: [Job Seeker Profile]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Job seeker profile ID or user ID
+ *     responses:
+ *       200:
+ *         description: Job seeker profile
+ *       404:
+ *         description: Profile not found
+ */
+router.get("/:id", async (req, res) => {
+  try {
+    const profile = await JobSeekerProfile.findById(req.params.id)
+      .populate('user', 'name')
+      .select('-email -phone -profileViews'); // Exclude sensitive fields for public view
+    
+    if (!profile) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
+
+    res.json(profile);
+  } catch (error) {
+    console.error("Get seeker profile error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;

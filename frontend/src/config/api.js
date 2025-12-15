@@ -13,6 +13,7 @@ export const API_ENDPOINTS = {
       get: `${API_BASE_URL}/profile/seeker`,
       update: `${API_BASE_URL}/profile/seeker`,
       downloadCV: `${API_BASE_URL}/profile/seeker/download-cv`,
+      getPublic: (id) => `${API_BASE_URL}/profile/seeker/${id}`,
       addSkill: `${API_BASE_URL}/profile/seeker/skills`,
       removeSkill: (skill) => `${API_BASE_URL}/profile/seeker/skills/${encodeURIComponent(skill)}`,
       addExperience: `${API_BASE_URL}/profile/seeker/experience`,

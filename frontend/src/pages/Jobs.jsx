@@ -33,12 +33,18 @@ export default function Jobs() {
   const [jobApplications, setJobApplications] = useState({})
   const [wishlistStatus, setWishlistStatus] = useState({})
   const [togglingWishlist, setTogglingWishlist] = useState(null)
+  const [appliedJobs, setAppliedJobs] = useState({}) // Tracks which jobs user has applied to
   const [interviewModal, setInterviewModal] = useState({ show: false, applicationId: null, jobId: null })
   const [interviewMessage, setInterviewMessage] = useState("")
   const [sendingInterview, setSendingInterview] = useState(false)
   const [bulkEmailModal, setBulkEmailModal] = useState({ show: false, jobId: null })
   const [bulkEmailForm, setBulkEmailForm] = useState({ subject: "", message: "", status: "" })
   const [sendingBulkEmail, setSendingBulkEmail] = useState(false)
+  const [editingJobId, setEditingJobId] = useState(null)
+  const [editJobForm, setEditJobForm] = useState({})
+  const [updatingJob, setUpdatingJob] = useState(false)
+  const [profileModal, setProfileModal] = useState({ show: false, profileId: null, profile: null })
+  const [loadingProfile, setLoadingProfile] = useState(false)
   
   // Refs for timeout cleanup
   const successTimeoutRef = useRef(null)
@@ -112,10 +118,11 @@ export default function Jobs() {
     fetchMyJobs()
   }, [fetchMyJobs])
 
-  // Check wishlist status for all jobs when jobs change
+  // Check wishlist status and applied status for all jobs when jobs change
   useEffect(() => {
     if (isSeeker && jobs.length > 0) {
       checkWishlistStatus()
+      checkAppliedStatus()
     }
   }, [jobs, isSeeker])
 
@@ -144,6 +151,31 @@ export default function Jobs() {
       setWishlistStatus(statusChecks)
     } catch (err) {
       console.error('Error checking wishlist status:', err)
+    }
+  }
+
+  const checkAppliedStatus = async () => {
+    if (!isSeeker) return
+    
+    try {
+      const response = await fetch(API_ENDPOINTS.applications.myApplications, {
+        headers: getAuthHeaders(),
+      })
+      
+      if (response.ok) {
+        const applications = await response.json()
+        const appliedJobsMap = {}
+        applications.forEach(app => {
+          appliedJobsMap[app.job._id || app.job] = {
+            applied: true,
+            status: app.status,
+            applicationId: app._id,
+          }
+        })
+        setAppliedJobs(appliedJobsMap)
+      }
+    } catch (err) {
+      console.error('Error checking applied status:', err)
     }
   }
 
@@ -286,6 +318,15 @@ export default function Jobs() {
 
       if (response.ok) {
         setApplySuccess(`Successfully applied to this job!`)
+        // Update applied jobs state
+        setAppliedJobs(prev => ({
+          ...prev,
+          [jobId]: {
+            applied: true,
+            status: 'pending',
+            applicationId: data._id,
+          }
+        }))
         if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
         successTimeoutRef.current = setTimeout(() => setApplySuccess(""), 3000)
       } else {
@@ -368,6 +409,113 @@ export default function Jobs() {
       setJobFormError("Network error. Please try again later.")
     } finally {
       setPostingJob(false)
+    }
+  }
+
+  const handleEditJob = (job) => {
+    setEditingJobId(job._id)
+    setEditJobForm({
+      title: job.title || "",
+      description: job.description || "",
+      location: job.location || "",
+      type: job.type || "full-time",
+      salaryMin: job.salary?.min || "",
+      salaryMax: job.salary?.max || "",
+      salaryCurrency: job.salary?.currency || "USD",
+      skills: job.skills?.join(", ") || "",
+      experience: job.experience || "",
+      openings: job.openings || "1",
+    })
+  }
+
+  const handleUpdateJob = async (e) => {
+    e.preventDefault()
+    setJobFormError("")
+    setJobFormSuccess("")
+
+    if (!editJobForm.title.trim() || !editJobForm.description.trim() || !editJobForm.location.trim()) {
+      setJobFormError("Title, description, and location are required")
+      return
+    }
+
+    const salary =
+      editJobForm.salaryMin || editJobForm.salaryMax
+        ? {
+            min: editJobForm.salaryMin ? Number(editJobForm.salaryMin) : undefined,
+            max: editJobForm.salaryMax ? Number(editJobForm.salaryMax) : undefined,
+            currency: editJobForm.salaryCurrency || "USD",
+          }
+        : undefined
+
+    const payload = {
+      title: editJobForm.title.trim(),
+      description: editJobForm.description.trim(),
+      location: editJobForm.location.trim(),
+      type: editJobForm.type,
+      experience: editJobForm.experience || undefined,
+      salary,
+      skills: editJobForm.skills
+        ? editJobForm.skills
+            .split(",")
+            .map((skill) => skill.trim())
+            .filter(Boolean)
+        : [],
+      openings: editJobForm.openings ? Number(editJobForm.openings) : undefined,
+    }
+
+    setUpdatingJob(true)
+    try {
+      const response = await fetch(API_ENDPOINTS.jobs.update(editingJobId), {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setJobFormSuccess("Job updated successfully!")
+        setEditingJobId(null)
+        setEditJobForm({})
+        fetchMyJobs()
+      } else {
+        setJobFormError(data.message || "Failed to update job")
+      }
+    } catch (err) {
+      console.error("Update job error:", err)
+      setJobFormError("Network error. Please try again later.")
+    } finally {
+      setUpdatingJob(false)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingJobId(null)
+    setEditJobForm({})
+    setJobFormError("")
+  }
+
+  const viewApplicantProfile = async (profileId) => {
+    setProfileModal({ show: true, profileId, profile: null })
+    setLoadingProfile(true)
+    setError("") // Clear any existing errors
+    try {
+      const response = await fetch(API_ENDPOINTS.profile.seeker.getPublic(profileId), {
+        headers: getAuthHeaders(),
+      })
+      const data = await response.json()
+      
+      if (response.ok) {
+        setProfileModal({ show: true, profileId, profile: data })
+      } else {
+        setError(data.message || "Failed to load profile")
+        setProfileModal({ show: false, profileId: null, profile: null })
+      }
+    } catch (err) {
+      console.error("Load profile error:", err)
+      setError("Network error. Please try again later.")
+      setProfileModal({ show: false, profileId: null, profile: null })
+    } finally {
+      setLoadingProfile(false)
     }
   }
 
@@ -663,6 +811,12 @@ export default function Jobs() {
                         </p>
                         <div className="flex flex-col gap-2 mt-2">
                           <button
+                            onClick={() => handleEditJob(job)}
+                            className="px-3 py-1 border border-[#2d2d4d] text-[#e0e0ff] rounded-lg font-semibold hover:border-[#0066ff] transition"
+                          >
+                            Edit Job
+                          </button>
+                          <button
                             onClick={() => toggleApplications(job._id)}
                             className="px-3 py-1 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition"
                           >
@@ -730,12 +884,22 @@ export default function Jobs() {
                                         </button>
                                       ))}
                                     </div>
-                                    <button
-                                      onClick={() => setInterviewModal({ show: true, applicationId: application._id, jobId: job._id })}
-                                      className="px-4 py-2 bg-green-500/20 text-green-400 border border-green-500/50 rounded-lg font-semibold hover:bg-green-500/30 transition text-sm"
-                                    >
-                                      Call for Interview
-                                    </button>
+                                    <div className="flex gap-2">
+                                      {application.applicantProfile?._id && (
+                                        <button
+                                          onClick={() => viewApplicantProfile(application.applicantProfile._id)}
+                                          className="px-4 py-2 bg-[#0066ff]/20 text-[#0066ff] border border-[#0066ff]/50 rounded-lg font-semibold hover:bg-[#0066ff]/30 transition text-sm"
+                                        >
+                                          View Profile
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={() => setInterviewModal({ show: true, applicationId: application._id, jobId: job._id })}
+                                        className="px-4 py-2 bg-green-500/20 text-green-400 border border-green-500/50 rounded-lg font-semibold hover:bg-green-500/30 transition text-sm"
+                                      >
+                                        Call for Interview
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                                 {application.coverLetter && (
@@ -761,13 +925,26 @@ export default function Jobs() {
           </div>
         )}
 
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#0066ff]"></div>
+        {/* All Jobs Section - Separated from My Jobs */}
+        <div className="mt-10">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <h2 className="text-2xl font-bold text-[#e0e0ff]">
+              {isCompany ? "Browse All Jobs" : "Available Jobs"}
+            </h2>
+            {isCompany && (
+              <p className="text-[#a0a0c0] text-sm">
+                Explore job openings from other companies in the market.
+              </p>
+            )}
           </div>
-        ) : (
-          <div className="grid gap-4">
-            {jobs.length ? (
+
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#0066ff]"></div>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {jobs.length ? (
               jobs.map((job) => (
                 <div key={job._id} className="bg-[#16213e] border border-[#2d2d4d] rounded-xl p-6 neon-glow hover:border-[#0066ff] transition">
                   <div className="flex justify-between items-start">
@@ -819,13 +996,28 @@ export default function Jobs() {
                         </button>
                       )}
                       {(isSeeker || !user) && (
-                        <button
-                          onClick={() => handleApply(job._id)}
-                          disabled={applying === job._id}
-                          className="px-4 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition disabled:opacity-50"
-                        >
-                          {applying === job._id ? "Applying..." : "Apply"}
-                        </button>
+                        appliedJobs[job._id]?.applied ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <button
+                              disabled
+                              className="px-4 py-2 bg-green-600/50 text-white rounded-lg font-semibold cursor-not-allowed"
+                              title="You have already applied to this job"
+                            >
+                              Applied
+                            </button>
+                            <span className="text-xs text-[#a0a0c0] capitalize">
+                              Status: {appliedJobs[job._id]?.status || 'pending'}
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleApply(job._id)}
+                            disabled={applying === job._id}
+                            className="px-4 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition disabled:opacity-50"
+                          >
+                            {applying === job._id ? "Applying..." : "Apply"}
+                          </button>
+                        )
                       )}
                     </div>
                   </div>
@@ -835,9 +1027,9 @@ export default function Jobs() {
               <p className="text-[#a0a0c0]">No jobs found</p>
             )}
           </div>
-        )}
+          )}
 
-        {paginationInfo.pages > 1 && (
+          {paginationInfo.pages > 1 && (
           <div className="flex justify-center gap-2 mt-8">
             <button
               onClick={handlePrevPage}
@@ -857,7 +1049,8 @@ export default function Jobs() {
               Next
             </button>
           </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Interview Invitation Modal */}
@@ -966,6 +1159,253 @@ export default function Jobs() {
                 className="flex-1 px-4 py-2 border border-[#2d2d4d] text-[#e0e0ff] rounded-lg font-semibold hover:border-[#0066ff] transition"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Job Modal */}
+      {editingJobId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-3xl w-full my-8">
+            <h2 className="text-2xl font-bold text-[#e0e0ff] mb-6">Edit Job</h2>
+            
+            {jobFormError && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                {jobFormError}
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateJob} className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[#a0a0c0] mb-2 font-medium">Job Title *</label>
+                  <input
+                    type="text"
+                    value={editJobForm.title}
+                    onChange={(e) => setEditJobForm({ ...editJobForm, title: e.target.value })}
+                    placeholder="e.g., Senior Software Engineer"
+                    className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#a0a0c0] mb-2 font-medium">Location *</label>
+                  <input
+                    type="text"
+                    value={editJobForm.location}
+                    onChange={(e) => setEditJobForm({ ...editJobForm, location: e.target.value })}
+                    placeholder="e.g., New York, NY"
+                    className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#a0a0c0] mb-2 font-medium">Job Type *</label>
+                  <select
+                    value={editJobForm.type}
+                    onChange={(e) => setEditJobForm({ ...editJobForm, type: e.target.value })}
+                    className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                  >
+                    <option value="full-time">Full-time</option>
+                    <option value="part-time">Part-time</option>
+                    <option value="contract">Contract</option>
+                    <option value="internship">Internship</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[#a0a0c0] mb-2 font-medium">Experience Level</label>
+                  <input
+                    type="text"
+                    value={editJobForm.experience}
+                    onChange={(e) => setEditJobForm({ ...editJobForm, experience: e.target.value })}
+                    placeholder="e.g., 3-5 years"
+                    className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#a0a0c0] mb-2 font-medium">Salary Min</label>
+                  <input
+                    type="number"
+                    value={editJobForm.salaryMin}
+                    onChange={(e) => setEditJobForm({ ...editJobForm, salaryMin: e.target.value })}
+                    placeholder="50000"
+                    className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#a0a0c0] mb-2 font-medium">Salary Max</label>
+                  <input
+                    type="number"
+                    value={editJobForm.salaryMax}
+                    onChange={(e) => setEditJobForm({ ...editJobForm, salaryMax: e.target.value })}
+                    placeholder="80000"
+                    className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#a0a0c0] mb-2 font-medium">Currency</label>
+                  <select
+                    value={editJobForm.salaryCurrency}
+                    onChange={(e) => setEditJobForm({ ...editJobForm, salaryCurrency: e.target.value })}
+                    className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                    <option value="BDT">BDT</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[#a0a0c0] mb-2 font-medium">Skills</label>
+                  <input
+                    type="text"
+                    value={editJobForm.skills}
+                    onChange={(e) => setEditJobForm({ ...editJobForm, skills: e.target.value })}
+                    placeholder="e.g., React, Node, SQL"
+                    className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#a0a0c0] mb-2 font-medium">Openings</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editJobForm.openings}
+                    onChange={(e) => setEditJobForm({ ...editJobForm, openings: e.target.value })}
+                    className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[#a0a0c0] mb-2 font-medium">Description *</label>
+                <textarea
+                  value={editJobForm.description}
+                  onChange={(e) => setEditJobForm({ ...editJobForm, description: e.target.value })}
+                  rows="6"
+                  className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="submit"
+                  disabled={updatingJob}
+                  className="flex-1 px-4 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition disabled:opacity-50"
+                >
+                  {updatingJob ? "Updating..." : "Update Job"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="flex-1 px-4 py-2 border border-[#2d2d4d] text-[#e0e0ff] rounded-lg font-semibold hover:border-[#0066ff] transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Applicant Profile Modal */}
+      {profileModal.show && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-3xl w-full my-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-[#e0e0ff]">Applicant Profile</h2>
+              <button
+                onClick={() => setProfileModal({ show: false, profileId: null, profile: null })}
+                className="text-[#a0a0c0] hover:text-[#e0e0ff] transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {loadingProfile ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#0066ff]"></div>
+              </div>
+            ) : profileModal.profile ? (
+              <div className="space-y-6">
+                {/* Basic Info */}
+                <div>
+                  <h3 className="text-xl font-semibold text-[#e0e0ff] mb-2">{profileModal.profile.fullName}</h3>
+                  {profileModal.profile.headline && (
+                    <p className="text-[#00d9ff] text-lg mb-2">{profileModal.profile.headline}</p>
+                  )}
+                  {profileModal.profile.location && (
+                    <div className="text-[#a0a0c0]">
+                      <p>📍 {profileModal.profile.location}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Bio */}
+                {profileModal.profile.bio && (
+                  <div>
+                    <h4 className="text-lg font-semibold text-[#e0e0ff] mb-2">About</h4>
+                    <p className="text-[#cbd5f5]">{profileModal.profile.bio}</p>
+                  </div>
+                )}
+
+                {/* Skills */}
+                {profileModal.profile.skills?.length > 0 && (
+                  <div>
+                    <h4 className="text-lg font-semibold text-[#e0e0ff] mb-2">Skills</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {profileModal.profile.skills.map((skill, idx) => (
+                        <span key={idx} className="px-3 py-1 bg-[#0066ff]/20 text-[#0066ff] rounded-lg text-sm">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Experience */}
+                {profileModal.profile.experience?.length > 0 && (
+                  <div>
+                    <h4 className="text-lg font-semibold text-[#e0e0ff] mb-3">Experience</h4>
+                    <div className="space-y-4">
+                      {profileModal.profile.experience.map((exp, idx) => (
+                        <div key={idx} className="border-l-2 border-[#0066ff] pl-4">
+                          <h5 className="font-semibold text-[#e0e0ff]">{exp.title}</h5>
+                          <p className="text-[#a0a0c0] text-sm">{exp.company} • {exp.duration}</p>
+                          {exp.description && (
+                            <p className="text-[#cbd5f5] text-sm mt-1">{exp.description}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Education */}
+                {profileModal.profile.education?.length > 0 && (
+                  <div>
+                    <h4 className="text-lg font-semibold text-[#e0e0ff] mb-3">Education</h4>
+                    <div className="space-y-3">
+                      {profileModal.profile.education.map((edu, idx) => (
+                        <div key={idx} className="border-l-2 border-[#0066ff] pl-4">
+                          <h5 className="font-semibold text-[#e0e0ff]">{edu.degree}</h5>
+                          <p className="text-[#a0a0c0] text-sm">{edu.school} • {edu.year}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-[#a0a0c0] text-center py-8">Failed to load profile</p>
+            )}
+
+            <div className="mt-6">
+              <button
+                onClick={() => setProfileModal({ show: false, profileId: null, profile: null })}
+                className="w-full px-4 py-2 border border-[#2d2d4d] text-[#e0e0ff] rounded-lg font-semibold hover:border-[#0066ff] transition"
+              >
+                Close
               </button>
             </div>
           </div>

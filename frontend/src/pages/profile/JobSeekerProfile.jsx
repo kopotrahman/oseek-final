@@ -321,6 +321,49 @@ export default function JobSeekerProfile() {
     }
   }
 
+  const handleProfilePictureChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Check file size (limit to 1MB)
+    if (file.size > 1024 * 1024) {
+      setError("Image size should be less than 1MB")
+      return
+    }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      setError("Please select a valid image file")
+      return
+    }
+
+    // Convert to base64
+    const reader = new FileReader()
+    reader.onloadend = async () => {
+      const base64String = reader.result
+      
+      try {
+        const response = await fetch(API_ENDPOINTS.profile.seeker.update, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ profilePicture: base64String }),
+        })
+        const data = await response.json()
+
+        if (response.ok) {
+          setProfile(data)
+          showSuccess("Profile picture updated!")
+        } else {
+          setError(data.message || "Failed to update profile picture")
+        }
+      } catch (err) {
+        console.error("Update profile picture error:", err)
+        setError("Network error. Please try again later.")
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#0f0f1e] via-[#1a1a2e] to-[#0f0f1e]">
@@ -357,6 +400,33 @@ export default function JobSeekerProfile() {
             >
               {downloadingCV ? "Generating PDF..." : "Download CV as PDF"}
             </button>
+          </div>
+
+          {/* Profile Picture */}
+          <div className="mb-8 flex flex-col items-center">
+            <div className="relative group">
+              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-[#0066ff] bg-[#0f0f1e] flex items-center justify-center">
+                {profile?.profilePicture ? (
+                  <img 
+                    src={profile.profilePicture} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-4xl text-[#a0a0c0]">👤</span>
+                )}
+              </div>
+              <label className="absolute bottom-0 right-0 bg-[#0066ff] hover:bg-[#0052cc] rounded-full p-2 cursor-pointer transition">
+                <Edit2 size={16} className="text-white" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProfilePictureChange}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            <p className="text-xs text-[#a0a0c0] mt-2">Click to upload (max 1MB)</p>
           </div>
 
           {/* Personal Info */}
