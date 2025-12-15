@@ -16,6 +16,7 @@ const {
   applicationRoutes,
   dashboardRoutes,
   adminRoutes,
+  wishlistRoutes,
 } = require("./routes");
 
 const app = express();
@@ -52,6 +53,7 @@ app.use("/api/jobs", jobRoutes);
 app.use("/api/applications", sensitiveOpLimiter, applicationRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/admin", sensitiveOpLimiter, adminRoutes);
+app.use("/api/wishlist", wishlistRoutes);
 
 
 if (!mongoose.connection.readyState) {
@@ -74,6 +76,7 @@ app.get("/", (req, res) =>
       applications: "/api/applications",
       dashboard: "/api/dashboard",
       admin: "/api/admin",
+      wishlist: "/api/wishlist",
     },
   })
 );

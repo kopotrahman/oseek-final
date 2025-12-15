@@ -5,6 +5,7 @@ const jobRoutes = require("./jobs");
 const applicationRoutes = require("./applications");
 const dashboardRoutes = require("./dashboard");
 const adminRoutes = require("./admin");
+const wishlistRoutes = require("./wishlist");
 
 module.exports = {
   authRoutes,
@@ -14,4 +15,5 @@ module.exports = {
   applicationRoutes,
   dashboardRoutes,
   adminRoutes,
+  wishlistRoutes,
 };

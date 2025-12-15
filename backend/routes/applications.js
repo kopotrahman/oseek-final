@@ -1,8 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
-const { Application, Job, JobSeekerProfile } = require("../models");
+const he = require("he");
+const { Application, Job, JobSeekerProfile, ActivityLog, User, CompanyProfile } = require("../models");
 const { auth, authorize } = require("../middleware");
+const { sendInterviewInvitation, sendEmail } = require("../utils/emailService");
 
 /**
  * @swagger
@@ -23,7 +25,7 @@ const { auth, authorize } = require("../middleware");
  *           type: string
  *         status:
  *           type: string
- *           enum: [pending, reviewing, shortlisted, rejected, accepted]
+ *           enum: [pending, reviewing, shortlisted, interview, rejected, hired, accepted]
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -112,6 +114,15 @@ router.post("/", auth, authorize("seeker"), async (req, res) => {
 
     
     await Job.findByIdAndUpdate(jobId, { $inc: { applicationsCount: 1 } });
+
+    // Log activity
+    await ActivityLog.create({
+      user: req.user._id,
+      type: "application_submitted",
+      description: `Applied to ${job.title}`,
+      relatedJob: jobId,
+      relatedApplication: application._id,
+    });
 
     res.status(201).json(application);
   } catch (error) {
@@ -270,7 +281,7 @@ router.get("/job/:jobId", auth, authorize("company"), async (req, res) => {
  *             properties:
  *               status:
  *                 type: string
- *                 enum: [pending, reviewing, shortlisted, rejected, accepted]
+ *                 enum: [pending, reviewing, shortlisted, interview, rejected, hired, accepted]
  *     responses:
  *       200:
  *         description: Application status updated
@@ -282,7 +293,7 @@ router.get("/job/:jobId", auth, authorize("company"), async (req, res) => {
 router.put("/:id/status", auth, authorize("company"), async (req, res) => {
   try {
     const { status } = req.body;
-    const validStatuses = ["pending", "reviewing", "shortlisted", "rejected", "accepted"];
+    const validStatuses = ["pending", "reviewing", "shortlisted", "interview", "rejected", "hired", "accepted"];
 
     if (!status || !validStatuses.includes(status)) {
       return res.status(400).json({ message: "Valid status is required" });
@@ -300,6 +311,15 @@ router.put("/:id/status", auth, authorize("company"), async (req, res) => {
 
     application.status = status;
     await application.save();
+
+    // Log activity
+    await ActivityLog.create({
+      user: application.applicant,
+      type: "application_updated",
+      description: `Application status updated to ${status} for ${application.job.title}`,
+      relatedJob: application.job._id,
+      relatedApplication: application._id,
+    });
 
     res.json(application);
   } catch (error) {
@@ -352,6 +372,205 @@ router.delete("/:id", auth, authorize("seeker"), async (req, res) => {
     res.json({ message: "Application withdrawn successfully" });
   } catch (error) {
     console.error("Withdraw application error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/applications/{id}/call-for-interview:
+ *   post:
+ *     summary: Call an applicant for interview (company only)
+ *     tags: [Applications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Application ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - message
+ *             properties:
+ *               message:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Interview invitation sent
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Application not found
+ */
+router.post("/:id/call-for-interview", auth, authorize("company"), async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ message: "Message is required" });
+    }
+
+    const application = await Application.findById(req.params.id)
+      .populate("job")
+      .populate("applicant", "name email");
+
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    if (application.job.company.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // Get company profile
+    const companyProfile = await CompanyProfile.findOne({ user: req.user._id });
+    const companyName = companyProfile?.companyName || req.user.name;
+
+    // Send interview invitation email
+    await sendInterviewInvitation(
+      application.applicant.email,
+      application.job.title,
+      companyName,
+      message
+    );
+
+    // Update application status to interview
+    application.status = "interview";
+    await application.save();
+
+    // Log activity
+    await ActivityLog.create({
+      user: application.applicant._id,
+      type: "interview_scheduled",
+      description: `Interview scheduled for ${application.job.title}`,
+      relatedJob: application.job._id,
+      relatedApplication: application._id,
+      metadata: { companyName },
+    });
+
+    res.json({ message: "Interview invitation sent successfully", application });
+  } catch (error) {
+    console.error("Call for interview error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/applications/job/{jobId}/bulk-email:
+ *   post:
+ *     summary: Send bulk email to applicants for a specific job (company only)
+ *     tags: [Applications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Job ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - subject
+ *               - message
+ *             properties:
+ *               subject:
+ *                 type: string
+ *               message:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *                 description: Optional - filter by application status
+ *     responses:
+ *       200:
+ *         description: Bulk email sent
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Job not found
+ */
+router.post("/job/:jobId/bulk-email", auth, authorize("company"), async (req, res) => {
+  try {
+    const { subject, message, status } = req.body;
+
+    if (!subject || !message) {
+      return res.status(400).json({ message: "Subject and message are required" });
+    }
+
+    const job = await Job.findById(req.params.jobId);
+
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    if (job.company.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // Find applications
+    const query = { job: req.params.jobId };
+    if (status) {
+      query.status = status;
+    }
+
+    const applications = await Application.find(query).populate("applicant", "name email");
+
+    if (applications.length === 0) {
+      return res.status(404).json({ message: "No applicants found" });
+    }
+
+    // Get company profile
+    const companyProfile = await CompanyProfile.findOne({ user: req.user._id });
+    const companyName = companyProfile?.companyName || req.user.name;
+
+    // Prepare emails
+    const emailRecipients = applications.map((app) => ({
+      to: app.applicant.email,
+      subject: subject,
+      text: message,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">${he.escape(companyName)}</h2>
+          <p>Regarding your application for: <strong>${he.escape(job.title)}</strong></p>
+          <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="white-space: pre-wrap;">${he.escape(message)}</p>
+          </div>
+          <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;" />
+          <p style="color: #6b7280; font-size: 14px;">Best regards,<br/>${he.escape(companyName)}</p>
+        </div>
+      `,
+    }));
+
+    // Send bulk emails
+    const { sendBulkEmail } = require("../utils/emailService");
+    const results = await sendBulkEmail(emailRecipients);
+
+    const successCount = results.filter((r) => r.success).length;
+    const failureCount = results.filter((r) => !r.success).length;
+
+    res.json({
+      message: "Bulk email sent",
+      total: applications.length,
+      success: successCount,
+      failed: failureCount,
+      results,
+    });
+  } catch (error) {
+    console.error("Bulk email error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });

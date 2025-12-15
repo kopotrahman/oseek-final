@@ -44,6 +44,14 @@ const jobSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    viewsCount: {
+      type: Number,
+      default: 0,
+    },
+    wishlistCount: {
+      type: Number,
+      default: 0,
+    },
     openings: {
       type: Number,
       default: 1,

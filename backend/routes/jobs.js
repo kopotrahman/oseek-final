@@ -1,7 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const { Job, Application, CompanyProfile } = require("../models");
+const { Job, Application, CompanyProfile, Wishlist, User } = require("../models");
 const { auth, authorize } = require("../middleware");
+const { sendWishlistNotification } = require("../utils/emailService");
 
 
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -284,6 +285,9 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ message: "Job not found" });
     }
 
+    // Increment view count (feature 4)
+    await Job.findByIdAndUpdate(req.params.id, { $inc: { viewsCount: 1 } });
+
     const companyProfile = await CompanyProfile.findOne({ user: job.company._id });
 
     res.json({
@@ -343,6 +347,53 @@ router.post("/", auth, authorize("company"), async (req, res) => {
     });
 
     await job.save();
+
+    // Send notifications to users who have similar jobs in wishlist (feature 5)
+    // Find users who might be interested based on title or skills
+    try {
+      const firstWord = title.trim().split(" ")[0];
+      const query = { _id: { $ne: job._id } };
+      
+      // Only add title regex if firstWord is not empty
+      if (firstWord && firstWord.length > 0) {
+        const escapedFirstWord = escapeRegex(firstWord);
+        query.$or = [
+          { title: { $regex: escapedFirstWord, $options: "i" } },
+          { skills: { $in: skills || [] } },
+        ];
+      } else if (skills && skills.length > 0) {
+        query.skills = { $in: skills };
+      } else {
+        // Skip notification if no valid search criteria
+        throw new Error("No valid criteria for similar jobs");
+      }
+      
+      const similarJobs = await Job.find(query).limit(10);
+
+      const similarJobIds = similarJobs.map((j) => j._id);
+      
+      const wishlists = await Wishlist.find({
+        job: { $in: similarJobIds },
+        notified: false,
+      }).populate("user");
+
+      // Send notifications to interested users
+      for (const wishlist of wishlists) {
+        if (wishlist.user && wishlist.user.email) {
+          await sendWishlistNotification(
+            wishlist.user.email,
+            job.title,
+            job._id
+          );
+          wishlist.notified = true;
+          await wishlist.save();
+        }
+      }
+    } catch (notificationError) {
+      console.error("Error sending wishlist notifications:", notificationError);
+      // Don't fail the job creation if notification fails
+    }
+
     res.status(201).json(job);
   } catch (error) {
     console.error("Create job error:", error);
