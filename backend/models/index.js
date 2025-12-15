@@ -3,6 +3,8 @@ const JobSeekerProfile = require("./JobSeekerProfile");
 const CompanyProfile = require("./CompanyProfile");
 const Job = require("./Job");
 const Application = require("./Application");
+const Wishlist = require("./Wishlist");
+const ActivityLog = require("./ActivityLog");
 
 module.exports = {
   User,
@@ -10,4 +12,6 @@ module.exports = {
   CompanyProfile,
   Job,
   Application,
+  Wishlist,
+  ActivityLog,
 };

@@ -207,4 +207,182 @@ router.delete("/companies/:id", auth, authorize("admin"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/users:
+ *   get:
+ *     summary: Get all users (admin only)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *           enum: [seeker, company, admin]
+ *         description: Filter by role
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by name or email
+ *     responses:
+ *       200:
+ *         description: List of users
+ *       403:
+ *         description: Forbidden - admin only
+ */
+router.get("/users", auth, authorize("admin"), async (req, res) => {
+  try {
+    const { role, search } = req.query;
+    let query = {};
+
+    if (role) {
+      query.role = role;
+    }
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const users = await User.find(query).sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: users.length,
+      users,
+    });
+  } catch (error) {
+    console.error("Get users error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/users/{id}/role:
+ *   put:
+ *     summary: Update user role and permissions (admin only)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - role
+ *             properties:
+ *               role:
+ *                 type: string
+ *                 enum: [seeker, company, admin]
+ *     responses:
+ *       200:
+ *         description: User role updated successfully
+ *       403:
+ *         description: Forbidden - admin only
+ *       404:
+ *         description: User not found
+ */
+router.put("/users/:id/role", auth, authorize("admin"), async (req, res) => {
+  try {
+    const { role } = req.body;
+
+    if (!role || !["seeker", "company", "admin"].includes(role)) {
+      return res.status(400).json({ message: "Valid role is required" });
+    }
+
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Prevent admin from changing their own role
+    if (user._id.toString() === req.user._id.toString()) {
+      return res.status(403).json({ message: "Cannot change your own role" });
+    }
+
+    user.role = role;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "User role updated successfully",
+      user,
+    });
+  } catch (error) {
+    console.error("Update user role error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/users/{id}:
+ *   delete:
+ *     summary: Delete a user account (admin only)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ *       403:
+ *         description: Forbidden - admin only
+ *       404:
+ *         description: User not found
+ */
+router.delete("/users/:id", auth, authorize("admin"), async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Prevent admin from deleting their own account
+    if (user._id.toString() === req.user._id.toString()) {
+      return res.status(403).json({ message: "Cannot delete your own account" });
+    }
+
+    // Delete associated profiles
+    if (user.role === "seeker") {
+      await JobSeekerProfile.deleteOne({ user: user._id });
+    } else if (user.role === "company") {
+      await CompanyProfile.deleteOne({ user: user._id });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: "User deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete user error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;

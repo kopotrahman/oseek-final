@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { Application, Job, JobSeekerProfile } = require("../models");
+const { Application, Job, JobSeekerProfile, Wishlist, ActivityLog } = require("../models");
 const { auth } = require("../middleware");
 
 /**
@@ -98,11 +98,33 @@ router.get("/stats", auth, async (req, res) => {
 
       const activeJobs = jobs.filter((job) => job.status === "open").length;
 
+      // Calculate analytics
+      const totalViews = jobs.reduce((sum, job) => sum + (job.viewsCount || 0), 0);
+      const totalWishlists = jobs.reduce((sum, job) => sum + (job.wishlistCount || 0), 0);
+      const shortlistedCount = await Application.countDocuments({ 
+        job: { $in: jobIds },
+        status: "shortlisted"
+      });
+
+      // Get job-wise analytics
+      const jobAnalytics = jobs.map((job) => ({
+        jobId: job._id,
+        title: job.title,
+        views: job.viewsCount || 0,
+        applications: job.applicationsCount || 0,
+        wishlists: job.wishlistCount || 0,
+        status: job.status,
+      }));
+
       res.json({
         totalJobs: jobs.length,
         activeJobs,
         totalApplications,
+        totalViews,
+        totalWishlists,
+        shortlistedCount,
         recentApplications,
+        jobAnalytics,
       });
     }
   } catch (error) {
@@ -133,23 +155,38 @@ router.get("/stats", auth, async (req, res) => {
 router.get("/activity", auth, async (req, res) => {
   try {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
-    const activities = [];
+    
+    // Get activity logs from the ActivityLog collection
+    const activityLogs = await ActivityLog.find({ user: req.user._id })
+      .populate("relatedJob", "title")
+      .sort({ createdAt: -1 })
+      .limit(limit);
 
-    if (req.user.role === "seeker") {
-      const applications = await Application.find({ applicant: req.user._id })
-        .populate("job", "title")
-        .sort({ updatedAt: -1 })
-        .limit(limit);
+    const activities = activityLogs.map((log) => ({
+      type: log.type,
+      description: log.description,
+      title: log.relatedJob?.title || "",
+      timestamp: log.createdAt,
+      metadata: log.metadata,
+    }));
 
-      applications.forEach((app) => {
-        activities.push({
-          type: "application",
-          action: app.status === "pending" ? "submitted" : `updated to ${app.status}`,
-          title: app.job?.title || "Unknown Job",
-          timestamp: app.updatedAt,
+    // Fallback to old method if no activity logs found
+    if (activities.length === 0) {
+      if (req.user.role === "seeker") {
+        const applications = await Application.find({ applicant: req.user._id })
+          .populate("job", "title")
+          .sort({ updatedAt: -1 })
+          .limit(limit);
+
+        applications.forEach((app) => {
+          activities.push({
+            type: "application",
+            action: app.status === "pending" ? "submitted" : `updated to ${app.status}`,
+            title: app.job?.title || "Unknown Job",
+            timestamp: app.updatedAt,
+          });
         });
-      });
-    } else {
+      } else {
       const jobs = await Job.find({ company: req.user._id });
       const jobIds = jobs.map((job) => job._id);
 
@@ -168,21 +205,22 @@ router.get("/activity", auth, async (req, res) => {
         });
       });
 
-      jobs
-        .sort((a, b) => b.createdAt - a.createdAt)
-        .slice(0, limit)
-        .forEach((job) => {
-          activities.push({
-            type: "job_created",
-            action: "created",
-            title: job.title,
-            timestamp: job.createdAt,
+        const jobs = await Job.find({ company: req.user._id });
+        jobs
+          .sort((a, b) => b.createdAt - a.createdAt)
+          .slice(0, limit)
+          .forEach((job) => {
+            activities.push({
+              type: "job_created",
+              action: "created",
+              title: job.title,
+              timestamp: job.createdAt,
+            });
           });
-        });
-    }
+      }
 
-   
-    activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    }
 
     res.json(activities.slice(0, limit));
   } catch (error) {
