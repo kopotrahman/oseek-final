@@ -46,6 +46,12 @@ export const API_ENDPOINTS = {
     stats: `${API_BASE_URL}/dashboard/stats`,
     activity: `${API_BASE_URL}/dashboard/activity`,
   },
+  admin: {
+    seekers: `${API_BASE_URL}/admin/seekers`,
+    companies: `${API_BASE_URL}/admin/companies`,
+    deleteSeeker: (id) => `${API_BASE_URL}/admin/seekers/${id}`,
+    deleteCompany: (id) => `${API_BASE_URL}/admin/companies/${id}`,
+  },
 }
 
 // Helper function to get auth headers
