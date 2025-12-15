@@ -34,6 +34,9 @@ const { auth, authorize } = require("../middleware");
  *           example: "2015"
  *         logo:
  *           type: string
+ *         profilePicture:
+ *           type: string
+ *           description: Base64 encoded profile picture
  */
 
 /**
@@ -104,6 +107,9 @@ router.get("/", auth, authorize("company"), async (req, res) => {
  *                 type: string
  *               logo:
  *                 type: string
+ *               profilePicture:
+ *                 type: string
+ *                 description: Base64 encoded profile picture
  *     responses:
  *       200:
  *         description: Profile updated

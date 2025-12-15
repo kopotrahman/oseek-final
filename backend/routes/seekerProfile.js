@@ -75,6 +75,9 @@ const { auth, authorize } = require("../middleware");
  *           type: string
  *         profileViews:
  *           type: number
+ *         profilePicture:
+ *           type: string
+ *           description: Base64 encoded profile picture
  */
 
 /**
@@ -139,6 +142,9 @@ router.get("/", auth, authorize("seeker"), async (req, res) => {
  *                 type: string
  *               bio:
  *                 type: string
+ *               profilePicture:
+ *                 type: string
+ *                 description: Base64 encoded profile picture
  *     responses:
  *       200:
  *         description: Profile updated
