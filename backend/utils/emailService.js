@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const he = require("he");
 
 // Create reusable transporter
 const createTransporter = () => {
@@ -129,7 +130,7 @@ OSEEK Team`;
       </div>
       <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 0;"><strong>Message from the company:</strong></p>
-        <p style="margin: 10px 0 0 0;">${message.replace(/\n/g, "<br/>")}</p>
+        <p style="margin: 10px 0 0 0;">${he.escape(message).replace(/\n/g, "<br/>")}</p>
       </div>
       <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;" />
       <p style="color: #6b7280; font-size: 14px;">Best regards,<br/>OSEEK Team</p>

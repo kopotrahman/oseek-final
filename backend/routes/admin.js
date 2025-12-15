@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { User, JobSeekerProfile, CompanyProfile } = require("../models");
+const { User, JobSeekerProfile, CompanyProfile, Application, Wishlist, ActivityLog, Job } = require("../models");
 const { auth, authorize } = require("../middleware");
 
 /**
@@ -366,12 +366,30 @@ router.delete("/users/:id", auth, authorize("admin"), async (req, res) => {
       return res.status(403).json({ message: "Cannot delete your own account" });
     }
 
-    // Delete associated profiles
+    // Delete associated data comprehensively
     if (user.role === "seeker") {
+      // Delete seeker profile
       await JobSeekerProfile.deleteOne({ user: user._id });
+      // Delete applications
+      await Application.deleteMany({ applicant: user._id });
+      // Delete wishlist items
+      await Wishlist.deleteMany({ user: user._id });
     } else if (user.role === "company") {
+      // Delete company profile
       await CompanyProfile.deleteOne({ user: user._id });
+      // Get all jobs posted by this company
+      const companyJobs = await Job.find({ company: user._id });
+      const jobIds = companyJobs.map(job => job._id);
+      // Delete applications for these jobs
+      await Application.deleteMany({ job: { $in: jobIds } });
+      // Delete wishlists for these jobs
+      await Wishlist.deleteMany({ job: { $in: jobIds } });
+      // Delete the jobs
+      await Job.deleteMany({ company: user._id });
     }
+    
+    // Delete activity logs
+    await ActivityLog.deleteMany({ user: user._id });
 
     await User.findByIdAndDelete(req.params.id);
 

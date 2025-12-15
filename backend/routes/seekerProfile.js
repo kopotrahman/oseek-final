@@ -577,11 +577,16 @@ router.get("/download-cv", auth, authorize("seeker"), async (req, res) => {
     // Create PDF document
     const doc = new PDFDocument({ margin: 50 });
 
+    // Sanitize filename to prevent header injection
+    const sanitizedName = (profile.fullName || "CV")
+      .replace(/[^a-zA-Z0-9_\-\s]/g, "")
+      .substring(0, 50);
+    
     // Set response headers
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${profile.fullName || "CV"}_Resume.pdf"`
+      `attachment; filename="${sanitizedName}_Resume.pdf"`
     );
 
     // Pipe PDF to response

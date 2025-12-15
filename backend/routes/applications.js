@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
+const he = require("he");
 const { Application, Job, JobSeekerProfile, ActivityLog, User, CompanyProfile } = require("../models");
 const { auth, authorize } = require("../middleware");
 const { sendInterviewInvitation, sendEmail } = require("../utils/emailService");
@@ -543,13 +544,13 @@ router.post("/job/:jobId/bulk-email", auth, authorize("company"), async (req, re
       text: message,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #2563eb;">${companyName}</h2>
-          <p>Regarding your application for: <strong>${job.title}</strong></p>
+          <h2 style="color: #2563eb;">${he.escape(companyName)}</h2>
+          <p>Regarding your application for: <strong>${he.escape(job.title)}</strong></p>
           <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <p style="white-space: pre-wrap;">${message}</p>
+            <p style="white-space: pre-wrap;">${he.escape(message)}</p>
           </div>
           <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;" />
-          <p style="color: #6b7280; font-size: 14px;">Best regards,<br/>${companyName}</p>
+          <p style="color: #6b7280; font-size: 14px;">Best regards,<br/>${he.escape(companyName)}</p>
         </div>
       `,
     }));

@@ -351,9 +351,11 @@ router.post("/", auth, authorize("company"), async (req, res) => {
     // Send notifications to users who have similar jobs in wishlist (feature 5)
     // Find users who might be interested based on title or skills
     try {
+      const firstWord = title.split(" ")[0];
+      const escapedFirstWord = escapeRegex(firstWord);
       const similarJobs = await Job.find({
         $or: [
-          { title: { $regex: title.split(" ")[0], $options: "i" } },
+          { title: { $regex: escapedFirstWord, $options: "i" } },
           { skills: { $in: skills || [] } },
         ],
         _id: { $ne: job._id },
