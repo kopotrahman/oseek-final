@@ -5,6 +5,7 @@ import Signup from "./pages/Signup"
 import JobSeekerProfile from "./pages/profile/JobSeekerProfile"
 import CompanyProfile from "./pages/profile/CompanyProfile"
 import Dashboard from "./pages/Dashboard"
+import AdminDashboard from "./pages/AdminDashboard"
 import Jobs from "./pages/Jobs"
 import ProtectedRoute from "./components/ProtectedRoute"
 
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/profile/seeker" element={<JobSeekerProfile />} />
           <Route path="/profile/company" element={<CompanyProfile />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
         </Route>
       </Routes>
     </Router>

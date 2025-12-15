@@ -23,6 +23,9 @@ export default function Header() {
     getServerSnapshot
   );
 
+  const user = token ? JSON.parse(localStorage.getItem("user") || "{}") : null;
+  const isAdmin = user?.role === "admin";
+
   const handleLogout = useCallback(() => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -51,7 +54,7 @@ export default function Header() {
           {token ? (
             <>
               <button
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate(isAdmin ? "/admin/dashboard" : "/dashboard")}
                 className="text-text-secondary hover:text-text transition"
               >
                 Dashboard

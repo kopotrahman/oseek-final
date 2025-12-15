@@ -36,7 +36,13 @@ export default function Login() {
         localStorage.setItem("token", data.token)
         localStorage.setItem("user", JSON.stringify(data.user))
         window.dispatchEvent(new Event("storage"))
-        navigate(role === "seeker" ? "/profile/seeker" : "/profile/company")
+        
+        // Redirect admin users to admin dashboard
+        if (data.user.role === "admin") {
+          navigate("/admin/dashboard")
+        } else {
+          navigate(role === "seeker" ? "/profile/seeker" : "/profile/company")
+        }
       } else {
         setError(data.message || "Login failed. Please check your credentials.")
       }

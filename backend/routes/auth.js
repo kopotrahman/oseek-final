@@ -194,7 +194,8 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    if (role && user.role !== role) {
+    // Allow admin to login from any role page
+    if (role && user.role !== role && user.role !== "admin") {
       return res.status(400).json({
         message: `This account is registered as ${user.role}. Please login with correct role.`,
       });
