@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import Header from "../components/Header"
 import { API_ENDPOINTS, getAuthHeaders } from "../config/api"
-import { MapPin, Briefcase, DollarSign, Clock } from "lucide-react"
+import { MapPin, Briefcase, DollarSign, Clock, Heart } from "lucide-react"
 
 export default function Jobs() {
   const [q, setQ] = useState("")
@@ -31,6 +31,8 @@ export default function Jobs() {
   const [myJobsLoading, setMyJobsLoading] = useState(false)
   const [expandedJobId, setExpandedJobId] = useState(null)
   const [jobApplications, setJobApplications] = useState({})
+  const [wishlistStatus, setWishlistStatus] = useState({})
+  const [togglingWishlist, setTogglingWishlist] = useState(null)
   
   // Refs for timeout cleanup
   const successTimeoutRef = useRef(null)
@@ -103,6 +105,78 @@ export default function Jobs() {
   useEffect(() => {
     fetchMyJobs()
   }, [fetchMyJobs])
+
+  // Check wishlist status for all jobs when jobs change
+  useEffect(() => {
+    if (isSeeker && jobs.length > 0) {
+      checkWishlistStatus()
+    }
+  }, [jobs, isSeeker])
+
+  const checkWishlistStatus = async () => {
+    if (!isSeeker) return
+    
+    const statusChecks = {}
+    for (const job of jobs) {
+      try {
+        const response = await fetch(API_ENDPOINTS.wishlist.check(job._id), {
+          headers: getAuthHeaders(),
+        })
+        const data = await response.json()
+        if (response.ok) {
+          statusChecks[job._id] = data.inWishlist || false
+        }
+      } catch (err) {
+        console.error(`Error checking wishlist for job ${job._id}:`, err)
+      }
+    }
+    setWishlistStatus(statusChecks)
+  }
+
+  const toggleWishlist = async (jobId) => {
+    if (!isSeeker) return
+    
+    setTogglingWishlist(jobId)
+    try {
+      const isInWishlist = wishlistStatus[jobId]
+      
+      if (isInWishlist) {
+        // Remove from wishlist
+        const response = await fetch(API_ENDPOINTS.wishlist.remove(jobId), {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        })
+        
+        if (response.ok) {
+          setWishlistStatus(prev => ({ ...prev, [jobId]: false }))
+          setApplySuccess("Removed from wishlist")
+          if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
+          successTimeoutRef.current = setTimeout(() => setApplySuccess(""), 3000)
+        }
+      } else {
+        // Add to wishlist
+        const response = await fetch(API_ENDPOINTS.wishlist.add, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ jobId }),
+        })
+        
+        if (response.ok) {
+          setWishlistStatus(prev => ({ ...prev, [jobId]: true }))
+          setApplySuccess("Added to wishlist")
+          if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
+          successTimeoutRef.current = setTimeout(() => setApplySuccess(""), 3000)
+        }
+      }
+    } catch (err) {
+      console.error("Toggle wishlist error:", err)
+      setError("Failed to update wishlist")
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current)
+      errorTimeoutRef.current = setTimeout(() => setError(""), 3000)
+    } finally {
+      setTogglingWishlist(null)
+    }
+  }
 
   const fetchJobApplications = async (jobId) => {
     setJobApplications((prev) => ({
@@ -550,7 +624,7 @@ export default function Jobs() {
                                       Status: <span className="text-[#e0e0ff] font-semibold">{application.status}</span>
                                     </span>
                                     <div className="flex flex-wrap gap-2">
-                                      {["pending", "reviewing", "shortlisted", "accepted", "rejected"].map((status) => (
+                                      {["pending", "reviewing", "shortlisted", "interview", "hired", "accepted", "rejected"].map((status) => (
                                         <button
                                           key={status}
                                           onClick={() => updateApplicationStatus(application._id, status, job._id)}
@@ -631,8 +705,22 @@ export default function Jobs() {
                         </div>
                       )}
                     </div>
-                    <div className="ml-4">
-                      {isSeeker || !user ? (
+                    <div className="ml-4 flex flex-col gap-2">
+                      {isSeeker && (
+                        <button
+                          onClick={() => toggleWishlist(job._id)}
+                          disabled={togglingWishlist === job._id}
+                          className="flex items-center justify-center px-4 py-2 border border-[#2d2d4d] rounded-lg hover:border-[#ff1744] transition disabled:opacity-50"
+                          title={wishlistStatus[job._id] ? "Remove from wishlist" : "Add to wishlist"}
+                        >
+                          <Heart
+                            size={20}
+                            className={wishlistStatus[job._id] ? "text-[#ff1744]" : "text-[#a0a0c0]"}
+                            fill={wishlistStatus[job._id] ? "#ff1744" : "none"}
+                          />
+                        </button>
+                      )}
+                      {(isSeeker || !user) && (
                         <button
                           onClick={() => handleApply(job._id)}
                           disabled={applying === job._id}
@@ -640,7 +728,7 @@ export default function Jobs() {
                         >
                           {applying === job._id ? "Applying..." : "Apply"}
                         </button>
-                      ) : null}
+                      )}
                     </div>
                   </div>
                 </div>

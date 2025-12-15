@@ -1,4 +1,4 @@
-import { LogOut, Briefcase } from "lucide-react";
+import { LogOut, Briefcase, Heart } from "lucide-react";
 import { useSyncExternalStore, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -25,6 +25,7 @@ export default function Header() {
 
   const user = token ? JSON.parse(localStorage.getItem("user") || "{}") : null;
   const isAdmin = user?.role === "admin";
+  const isSeeker = user?.role === "seeker";
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem("token");
@@ -53,6 +54,15 @@ export default function Header() {
           </button>
           {token ? (
             <>
+              {isSeeker && (
+                <button
+                  onClick={() => navigate("/wishlist")}
+                  className="flex items-center gap-2 text-text-secondary hover:text-text transition"
+                >
+                  <Heart className="w-4 h-4" />
+                  Wishlist
+                </button>
+              )}
               <button
                 onClick={() => navigate(isAdmin ? "/admin/dashboard" : "/dashboard")}
                 className="text-text-secondary hover:text-text transition"

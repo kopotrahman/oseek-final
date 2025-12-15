@@ -12,6 +12,7 @@ export const API_ENDPOINTS = {
     seeker: {
       get: `${API_BASE_URL}/profile/seeker`,
       update: `${API_BASE_URL}/profile/seeker`,
+      downloadCV: `${API_BASE_URL}/profile/seeker/download-cv`,
       addSkill: `${API_BASE_URL}/profile/seeker/skills`,
       removeSkill: (skill) => `${API_BASE_URL}/profile/seeker/skills/${encodeURIComponent(skill)}`,
       addExperience: `${API_BASE_URL}/profile/seeker/experience`,
@@ -41,6 +42,8 @@ export const API_ENDPOINTS = {
     forJob: (jobId) => `${API_BASE_URL}/applications/job/${jobId}`,
     updateStatus: (id) => `${API_BASE_URL}/applications/${id}/status`,
     withdraw: (id) => `${API_BASE_URL}/applications/${id}`,
+    callForInterview: (id) => `${API_BASE_URL}/applications/${id}/call-for-interview`,
+    bulkEmail: (jobId) => `${API_BASE_URL}/applications/job/${jobId}/bulk-email`,
   },
   dashboard: {
     stats: `${API_BASE_URL}/dashboard/stats`,
@@ -51,6 +54,15 @@ export const API_ENDPOINTS = {
     companies: `${API_BASE_URL}/admin/companies`,
     deleteSeeker: (id) => `${API_BASE_URL}/admin/seekers/${id}`,
     deleteCompany: (id) => `${API_BASE_URL}/admin/companies/${id}`,
+    users: `${API_BASE_URL}/admin/users`,
+    updateUserRole: (id) => `${API_BASE_URL}/admin/users/${id}/role`,
+    deleteUser: (id) => `${API_BASE_URL}/admin/users/${id}`,
+  },
+  wishlist: {
+    list: `${API_BASE_URL}/wishlist`,
+    add: `${API_BASE_URL}/wishlist`,
+    remove: (jobId) => `${API_BASE_URL}/wishlist/${jobId}`,
+    check: (jobId) => `${API_BASE_URL}/wishlist/check/${jobId}`,
   },
 }
 
