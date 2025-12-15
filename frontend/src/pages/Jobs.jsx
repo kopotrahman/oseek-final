@@ -497,6 +497,7 @@ export default function Jobs() {
   const viewApplicantProfile = async (profileId) => {
     setProfileModal({ show: true, profileId, profile: null })
     setLoadingProfile(true)
+    setError("") // Clear any existing errors
     try {
       const response = await fetch(API_ENDPOINTS.profile.seeker.getPublic(profileId), {
         headers: getAuthHeaders(),
@@ -506,11 +507,13 @@ export default function Jobs() {
       if (response.ok) {
         setProfileModal({ show: true, profileId, profile: data })
       } else {
-        setJobFormError(data.message || "Failed to load profile")
+        setError(data.message || "Failed to load profile")
+        setProfileModal({ show: false, profileId: null, profile: null })
       }
     } catch (err) {
       console.error("Load profile error:", err)
-      setJobFormError("Network error. Please try again later.")
+      setError("Network error. Please try again later.")
+      setProfileModal({ show: false, profileId: null, profile: null })
     } finally {
       setLoadingProfile(false)
     }
@@ -1331,11 +1334,11 @@ export default function Jobs() {
                   {profileModal.profile.headline && (
                     <p className="text-[#00d9ff] text-lg mb-2">{profileModal.profile.headline}</p>
                   )}
-                  <div className="text-[#a0a0c0] space-y-1">
-                    {profileModal.profile.email && <p>📧 {profileModal.profile.email}</p>}
-                    {profileModal.profile.phone && <p>📱 {profileModal.profile.phone}</p>}
-                    {profileModal.profile.location && <p>📍 {profileModal.profile.location}</p>}
-                  </div>
+                  {profileModal.profile.location && (
+                    <div className="text-[#a0a0c0]">
+                      <p>📍 {profileModal.profile.location}</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Bio */}

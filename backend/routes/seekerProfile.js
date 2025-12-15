@@ -690,7 +690,9 @@ router.get("/download-cv", auth, authorize("seeker"), async (req, res) => {
  */
 router.get("/:id", async (req, res) => {
   try {
-    const profile = await JobSeekerProfile.findById(req.params.id).populate('user', 'name email');
+    const profile = await JobSeekerProfile.findById(req.params.id)
+      .populate('user', 'name')
+      .select('-email -phone -profileViews'); // Exclude sensitive fields for public view
     
     if (!profile) {
       return res.status(404).json({ message: "Profile not found" });

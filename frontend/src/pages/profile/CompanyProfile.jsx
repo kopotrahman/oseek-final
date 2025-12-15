@@ -103,7 +103,7 @@ export default function CompanyProfile() {
         const response = await fetch(API_ENDPOINTS.profile.company.update, {
           method: "PUT",
           headers: getAuthHeaders(),
-          body: JSON.stringify({ ...profile, profilePicture: base64String }),
+          body: JSON.stringify({ profilePicture: base64String }),
         })
         const data = await response.json()
 
