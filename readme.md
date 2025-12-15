@@ -1,2 +1,1 @@
-Assalamualaikum
-Shafee gay
+Bismillah
