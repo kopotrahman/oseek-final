@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import Header from "../components/Header"
-import { BarChart3, Users, FileText, Settings, Briefcase, Clock } from "lucide-react"
+import { BarChart3, Users, FileText, Settings, Briefcase, Clock, Eye, Heart, UserCheck } from "lucide-react"
 import { API_ENDPOINTS, getAuthHeaders } from "../config/api"
 
 export default function Dashboard() {
@@ -114,7 +114,7 @@ export default function Dashboard() {
           { icon: <Briefcase size={32} />, label: "Total Jobs", value: stats?.totalJobs || 0 },
           { icon: <FileText size={32} />, label: "Active Jobs", value: stats?.activeJobs || 0 },
           { icon: <Users size={32} />, label: "Total Applications", value: stats?.totalApplications || 0 },
-          { icon: <Settings size={32} />, label: "Settings", value: "Configure" },
+          { icon: <Eye size={32} />, label: "Total Views", value: stats?.totalViews || 0 },
         ].map((card, idx) => (
           <div
             key={idx}
@@ -127,7 +127,24 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-3 gap-6 mb-12">
+        {[
+          { icon: <Heart size={24} />, label: "Wishlist Saves", value: stats?.totalWishlists || 0, color: "text-[#ff1744]" },
+          { icon: <UserCheck size={24} />, label: "Shortlisted", value: stats?.shortlistedCount || 0, color: "text-[#00d9ff]" },
+          { icon: <BarChart3 size={24} />, label: "Avg. Applications/Job", value: stats?.totalJobs > 0 ? Math.round((stats?.totalApplications || 0) / stats.totalJobs) : 0, color: "text-[#0066ff]" },
+        ].map((card, idx) => (
+          <div
+            key={idx}
+            className="bg-[#16213e] border border-[#2d2d4d] rounded-xl p-6 neon-glow hover:border-[#0066ff] transition"
+          >
+            <div className={`${card.color} mb-3`}>{card.icon}</div>
+            <p className="text-[#a0a0c0] text-sm font-medium">{card.label}</p>
+            <p className="text-[#e0e0ff] text-2xl font-bold">{card.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6 mb-6">
         <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 neon-glow">
           <h2 className="text-2xl font-bold text-[#e0e0ff] mb-6">Quick Actions</h2>
           <div className="space-y-3">
@@ -174,6 +191,59 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {stats?.jobAnalytics?.length > 0 && (
+        <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 neon-glow">
+          <h2 className="text-2xl font-bold text-[#e0e0ff] mb-6">Job Performance Analytics</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[#2d2d4d]">
+                  <th className="text-left py-3 px-4 text-[#a0a0c0] font-medium">Job Title</th>
+                  <th className="text-center py-3 px-4 text-[#a0a0c0] font-medium">Views</th>
+                  <th className="text-center py-3 px-4 text-[#a0a0c0] font-medium">Applications</th>
+                  <th className="text-center py-3 px-4 text-[#a0a0c0] font-medium">Wishlist</th>
+                  <th className="text-center py-3 px-4 text-[#a0a0c0] font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.jobAnalytics.slice(0, 10).map((job, idx) => (
+                  <tr key={idx} className="border-b border-[#2d2d4d] hover:bg-[#0f0f1e] transition">
+                    <td className="py-3 px-4 text-[#e0e0ff] font-medium">{job.title}</td>
+                    <td className="py-3 px-4 text-center">
+                      <span className="flex items-center justify-center gap-1 text-[#a0a0c0]">
+                        <Eye size={14} />
+                        {job.views || 0}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span className="flex items-center justify-center gap-1 text-[#a0a0c0]">
+                        <Users size={14} />
+                        {job.applications || 0}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span className="flex items-center justify-center gap-1 text-[#a0a0c0]">
+                        <Heart size={14} />
+                        {job.wishlists || 0}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        job.status === 'open' ? 'bg-green-500/20 text-green-400' :
+                        job.status === 'closed' ? 'bg-red-500/20 text-red-400' :
+                        'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {job.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </>
   )
 

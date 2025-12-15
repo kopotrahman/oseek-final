@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import Header from "../components/Header"
 import { API_ENDPOINTS, getAuthHeaders } from "../config/api"
-import { MapPin, Briefcase, DollarSign, Clock } from "lucide-react"
+import { MapPin, Briefcase, DollarSign, Clock, Heart } from "lucide-react"
 
 export default function Jobs() {
   const [q, setQ] = useState("")
@@ -31,6 +31,14 @@ export default function Jobs() {
   const [myJobsLoading, setMyJobsLoading] = useState(false)
   const [expandedJobId, setExpandedJobId] = useState(null)
   const [jobApplications, setJobApplications] = useState({})
+  const [wishlistStatus, setWishlistStatus] = useState({})
+  const [togglingWishlist, setTogglingWishlist] = useState(null)
+  const [interviewModal, setInterviewModal] = useState({ show: false, applicationId: null, jobId: null })
+  const [interviewMessage, setInterviewMessage] = useState("")
+  const [sendingInterview, setSendingInterview] = useState(false)
+  const [bulkEmailModal, setBulkEmailModal] = useState({ show: false, jobId: null })
+  const [bulkEmailForm, setBulkEmailForm] = useState({ subject: "", message: "", status: "" })
+  const [sendingBulkEmail, setSendingBulkEmail] = useState(false)
   
   // Refs for timeout cleanup
   const successTimeoutRef = useRef(null)
@@ -103,6 +111,86 @@ export default function Jobs() {
   useEffect(() => {
     fetchMyJobs()
   }, [fetchMyJobs])
+
+  // Check wishlist status for all jobs when jobs change
+  useEffect(() => {
+    if (isSeeker && jobs.length > 0) {
+      checkWishlistStatus()
+    }
+  }, [jobs, isSeeker])
+
+  const checkWishlistStatus = async () => {
+    if (!isSeeker) return
+    
+    try {
+      // Use Promise.all to check all jobs in parallel instead of sequentially
+      const statusPromises = jobs.map(job =>
+        fetch(API_ENDPOINTS.wishlist.check(job._id), {
+          headers: getAuthHeaders(),
+        })
+        .then(res => res.json())
+        .then(data => ({ jobId: job._id, inWishlist: data.inWishlist || false }))
+        .catch(err => {
+          console.error(`Error checking wishlist for job ${job._id}:`, err)
+          return { jobId: job._id, inWishlist: false }
+        })
+      )
+      
+      const results = await Promise.all(statusPromises)
+      const statusChecks = {}
+      results.forEach(result => {
+        statusChecks[result.jobId] = result.inWishlist
+      })
+      setWishlistStatus(statusChecks)
+    } catch (err) {
+      console.error('Error checking wishlist status:', err)
+    }
+  }
+
+  const toggleWishlist = async (jobId) => {
+    if (!isSeeker) return
+    
+    setTogglingWishlist(jobId)
+    try {
+      const isInWishlist = wishlistStatus[jobId]
+      
+      if (isInWishlist) {
+        // Remove from wishlist
+        const response = await fetch(API_ENDPOINTS.wishlist.remove(jobId), {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        })
+        
+        if (response.ok) {
+          setWishlistStatus(prev => ({ ...prev, [jobId]: false }))
+          setApplySuccess("Removed from wishlist")
+          if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
+          successTimeoutRef.current = setTimeout(() => setApplySuccess(""), 3000)
+        }
+      } else {
+        // Add to wishlist
+        const response = await fetch(API_ENDPOINTS.wishlist.add, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ jobId }),
+        })
+        
+        if (response.ok) {
+          setWishlistStatus(prev => ({ ...prev, [jobId]: true }))
+          setApplySuccess("Added to wishlist")
+          if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
+          successTimeoutRef.current = setTimeout(() => setApplySuccess(""), 3000)
+        }
+      }
+    } catch (err) {
+      console.error("Toggle wishlist error:", err)
+      setError("Failed to update wishlist")
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current)
+      errorTimeoutRef.current = setTimeout(() => setError(""), 3000)
+    } finally {
+      setTogglingWishlist(null)
+    }
+  }
 
   const fetchJobApplications = async (jobId) => {
     setJobApplications((prev) => ({
@@ -280,6 +368,74 @@ export default function Jobs() {
       setJobFormError("Network error. Please try again later.")
     } finally {
       setPostingJob(false)
+    }
+  }
+
+  const sendInterviewInvitation = async () => {
+    if (!interviewMessage.trim()) {
+      // Show error in modal context
+      setJobFormError("Please enter an interview message")
+      return
+    }
+
+    setSendingInterview(true)
+    setJobFormError("")
+    try {
+      const response = await fetch(API_ENDPOINTS.applications.callForInterview(interviewModal.applicationId), {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ message: interviewMessage }),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setJobFormSuccess("Interview invitation sent successfully!")
+        setInterviewModal({ show: false, applicationId: null, jobId: null })
+        setInterviewMessage("")
+        setJobFormError("") // Clear any errors
+        // Refresh applications for this job
+        if (interviewModal.jobId) {
+          fetchJobApplications(interviewModal.jobId)
+        }
+      } else {
+        setJobFormError(data.message || "Failed to send interview invitation")
+      }
+    } catch (err) {
+      console.error("Send interview invitation error:", err)
+      setJobFormError("Network error. Please try again later.")
+    } finally {
+      setSendingInterview(false)
+    }
+  }
+
+  const sendBulkEmail = async () => {
+    if (!bulkEmailForm.subject.trim() || !bulkEmailForm.message.trim()) {
+      setError("Subject and message are required")
+      return
+    }
+
+    setSendingBulkEmail(true)
+    setError("")
+    try {
+      const response = await fetch(API_ENDPOINTS.applications.bulkEmail(bulkEmailModal.jobId), {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(bulkEmailForm),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setJobFormSuccess(`Bulk email sent: ${data.success} succeeded, ${data.failed} failed`)
+        setBulkEmailModal({ show: false, jobId: null })
+        setBulkEmailForm({ subject: "", message: "", status: "" })
+      } else {
+        setError(data.message || "Failed to send bulk email")
+      }
+    } catch (err) {
+      console.error("Send bulk email error:", err)
+      setError("Network error. Please try again later.")
+    } finally {
+      setSendingBulkEmail(false)
     }
   }
 
@@ -505,12 +661,22 @@ export default function Jobs() {
                         <p className="mt-1">
                           Applications: <span className="text-[#e0e0ff] font-semibold">{job.applicationsCount ?? 0}</span>
                         </p>
-                        <button
-                          onClick={() => toggleApplications(job._id)}
-                          className="mt-2 px-3 py-1 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition"
-                        >
-                          {expandedJobId === job._id ? "Hide applicants" : "View applicants"}
-                        </button>
+                        <div className="flex flex-col gap-2 mt-2">
+                          <button
+                            onClick={() => toggleApplications(job._id)}
+                            className="px-3 py-1 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition"
+                          >
+                            {expandedJobId === job._id ? "Hide applicants" : "View applicants"}
+                          </button>
+                          {job.applicationsCount > 0 && (
+                            <button
+                              onClick={() => setBulkEmailModal({ show: true, jobId: job._id })}
+                              className="px-3 py-1 border border-[#2d2d4d] text-[#e0e0ff] rounded-lg font-semibold hover:border-[#0066ff] transition"
+                            >
+                              Send Bulk Email
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                     {expandedJobId === job._id && (
@@ -550,7 +716,7 @@ export default function Jobs() {
                                       Status: <span className="text-[#e0e0ff] font-semibold">{application.status}</span>
                                     </span>
                                     <div className="flex flex-wrap gap-2">
-                                      {["pending", "reviewing", "shortlisted", "accepted", "rejected"].map((status) => (
+                                      {["pending", "reviewing", "shortlisted", "interview", "hired", "accepted", "rejected"].map((status) => (
                                         <button
                                           key={status}
                                           onClick={() => updateApplicationStatus(application._id, status, job._id)}
@@ -564,6 +730,12 @@ export default function Jobs() {
                                         </button>
                                       ))}
                                     </div>
+                                    <button
+                                      onClick={() => setInterviewModal({ show: true, applicationId: application._id, jobId: job._id })}
+                                      className="px-4 py-2 bg-green-500/20 text-green-400 border border-green-500/50 rounded-lg font-semibold hover:bg-green-500/30 transition text-sm"
+                                    >
+                                      Call for Interview
+                                    </button>
                                   </div>
                                 </div>
                                 {application.coverLetter && (
@@ -631,8 +803,22 @@ export default function Jobs() {
                         </div>
                       )}
                     </div>
-                    <div className="ml-4">
-                      {isSeeker || !user ? (
+                    <div className="ml-4 flex flex-col gap-2">
+                      {isSeeker && (
+                        <button
+                          onClick={() => toggleWishlist(job._id)}
+                          disabled={togglingWishlist === job._id}
+                          className="flex items-center justify-center px-4 py-2 border border-[#2d2d4d] rounded-lg hover:border-[#ff1744] transition disabled:opacity-50"
+                          title={wishlistStatus[job._id] ? "Remove from wishlist" : "Add to wishlist"}
+                        >
+                          <Heart
+                            size={20}
+                            className={wishlistStatus[job._id] ? "text-[#ff1744]" : "text-[#a0a0c0]"}
+                            fill={wishlistStatus[job._id] ? "#ff1744" : "none"}
+                          />
+                        </button>
+                      )}
+                      {(isSeeker || !user) && (
                         <button
                           onClick={() => handleApply(job._id)}
                           disabled={applying === job._id}
@@ -640,7 +826,7 @@ export default function Jobs() {
                         >
                           {applying === job._id ? "Applying..." : "Apply"}
                         </button>
-                      ) : null}
+                      )}
                     </div>
                   </div>
                 </div>
@@ -673,6 +859,118 @@ export default function Jobs() {
           </div>
         )}
       </div>
+
+      {/* Interview Invitation Modal */}
+      {interviewModal.show && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-md w-full">
+            <h2 className="text-2xl font-bold text-[#e0e0ff] mb-4">Call for Interview</h2>
+            <p className="text-[#a0a0c0] mb-4">Send an interview invitation to the applicant</p>
+            
+            {jobFormError && interviewModal.show && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                {jobFormError}
+              </div>
+            )}
+            
+            <textarea
+              value={interviewMessage}
+              onChange={(e) => setInterviewMessage(e.target.value)}
+              placeholder="Enter your interview invitation message..."
+              className="w-full px-4 py-3 bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg text-[#e0e0ff] placeholder-[#9aa1b3] focus:outline-none focus:border-[#0066ff] min-h-[150px]"
+            />
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={sendInterviewInvitation}
+                disabled={sendingInterview}
+                className="flex-1 px-4 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition disabled:opacity-50"
+              >
+                {sendingInterview ? "Sending..." : "Send Invitation"}
+              </button>
+              <button
+                onClick={() => {
+                  setInterviewModal({ show: false, applicationId: null, jobId: null })
+                  setInterviewMessage("")
+                  setJobFormError("") // Clear errors when closing
+                }}
+                className="flex-1 px-4 py-2 border border-[#2d2d4d] text-[#e0e0ff] rounded-lg font-semibold hover:border-[#0066ff] transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Email Modal */}
+      {bulkEmailModal.show && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-lg w-full">
+            <h2 className="text-2xl font-bold text-[#e0e0ff] mb-4">Send Bulk Email</h2>
+            <p className="text-[#a0a0c0] mb-4">Send an email to all applicants for this job</p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[#a0a0c0] mb-2 font-medium">Subject *</label>
+                <input
+                  type="text"
+                  value={bulkEmailForm.subject}
+                  onChange={(e) => setBulkEmailForm({ ...bulkEmailForm, subject: e.target.value })}
+                  placeholder="Email subject"
+                  className="w-full px-4 py-2 bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg text-[#e0e0ff] placeholder-[#9aa1b3] focus:outline-none focus:border-[#0066ff]"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-[#a0a0c0] mb-2 font-medium">Message *</label>
+                <textarea
+                  value={bulkEmailForm.message}
+                  onChange={(e) => setBulkEmailForm({ ...bulkEmailForm, message: e.target.value })}
+                  placeholder="Enter your message..."
+                  className="w-full px-4 py-3 bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg text-[#e0e0ff] placeholder-[#9aa1b3] focus:outline-none focus:border-[#0066ff] min-h-[150px]"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-[#a0a0c0] mb-2 font-medium">Filter by Status (optional)</label>
+                <select
+                  value={bulkEmailForm.status}
+                  onChange={(e) => setBulkEmailForm({ ...bulkEmailForm, status: e.target.value })}
+                  className="w-full px-4 py-2 bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg text-[#e0e0ff] focus:outline-none focus:border-[#0066ff]"
+                >
+                  <option value="">All applicants</option>
+                  <option value="pending">Pending</option>
+                  <option value="reviewing">Reviewing</option>
+                  <option value="shortlisted">Shortlisted</option>
+                  <option value="interview">Interview</option>
+                  <option value="hired">Hired</option>
+                  <option value="accepted">Accepted</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={sendBulkEmail}
+                disabled={sendingBulkEmail}
+                className="flex-1 px-4 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition disabled:opacity-50"
+              >
+                {sendingBulkEmail ? "Sending..." : "Send Email"}
+              </button>
+              <button
+                onClick={() => {
+                  setBulkEmailModal({ show: false, jobId: null })
+                  setBulkEmailForm({ subject: "", message: "", status: "" })
+                }}
+                className="flex-1 px-4 py-2 border border-[#2d2d4d] text-[#e0e0ff] rounded-lg font-semibold hover:border-[#0066ff] transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

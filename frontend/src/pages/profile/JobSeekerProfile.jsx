@@ -12,6 +12,7 @@ export default function JobSeekerProfile() {
   const [newSkill, setNewSkill] = useState("")
   const [editingProfile, setEditingProfile] = useState(false)
   const [editForm, setEditForm] = useState({})
+  const [downloadingCV, setDownloadingCV] = useState(false)
   
   // Experience form states
   const [showExpForm, setShowExpForm] = useState(false)
@@ -283,32 +284,41 @@ export default function JobSeekerProfile() {
     }
   }
 
-  const downloadCV = () => {
+  const downloadCV = async () => {
     if (!profile) return
     
-    const cvContent = `
-${profile.fullName}
-${profile.headline || ""}
-${profile.email} | ${profile.phone || ""} | ${profile.location || ""}
-
-PROFESSIONAL SUMMARY
-${profile.bio || ""}
-
-SKILLS
-${(profile.skills || []).join(", ")}
-
-EXPERIENCE
-${(profile.experience || []).map((exp) => `${exp.title} at ${exp.company} (${exp.duration})\n${exp.description || ""}`).join("\n\n")}
-
-EDUCATION
-${(profile.education || []).map((edu) => `${edu.degree} from ${edu.school} (${edu.year})`).join("\n")}
-`
-    const blob = new Blob([cvContent], { type: "text/plain" })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "CV.txt"
-    a.click()
+    setDownloadingCV(true)
+    setError("")
+    
+    try {
+      const headers = getAuthHeaders()
+      delete headers['Content-Type'] // Remove Content-Type for blob response
+      
+      const response = await fetch(API_ENDPOINTS.profile.seeker.downloadCV, {
+        headers: headers
+      })
+      
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${profile.fullName?.replace(/\s+/g, '_') || 'CV'}_Resume.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+        showSuccess("CV downloaded successfully!")
+      } else {
+        const data = await response.json()
+        setError(data.message || "Failed to download CV")
+      }
+    } catch (err) {
+      console.error("Download CV error:", err)
+      setError("Network error. Please try again later.")
+    } finally {
+      setDownloadingCV(false)
+    }
   }
 
   if (loading) {
@@ -342,9 +352,10 @@ ${(profile.education || []).map((edu) => `${edu.degree} from ${edu.school} (${ed
             <h1 className="text-4xl font-bold text-[#e0e0ff]">My Profile</h1>
             <button
               onClick={downloadCV}
-              className="px-6 py-2 bg-[#00d9ff] text-[#0f0f1e] rounded-lg font-semibold hover:bg-[#00b8d4] transition"
+              disabled={downloadingCV}
+              className="px-6 py-2 bg-[#00d9ff] text-[#0f0f1e] rounded-lg font-semibold hover:bg-[#00b8d4] transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Download CV
+              {downloadingCV ? "Generating PDF..." : "Download CV as PDF"}
             </button>
           </div>
 

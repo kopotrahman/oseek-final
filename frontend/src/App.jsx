@@ -7,6 +7,7 @@ import CompanyProfile from "./pages/profile/CompanyProfile"
 import Dashboard from "./pages/Dashboard"
 import AdminDashboard from "./pages/AdminDashboard"
 import Jobs from "./pages/Jobs"
+import Wishlist from "./pages/Wishlist"
 import ProtectedRoute from "./components/ProtectedRoute"
 
 export default function App() {
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/profile/company" element={<CompanyProfile />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/wishlist" element={<Wishlist />} />
         </Route>
       </Routes>
     </Router>
