@@ -150,7 +150,7 @@ router.get("/", auth, authorize("seeker"), async (req, res) => {
 router.put("/", auth, authorize("seeker"), async (req, res) => {
   try {
     const updates = req.body;
-    const allowedUpdates = ["fullName", "phone", "location", "headline", "bio", "resumeUrl"];
+    const allowedUpdates = ["fullName", "phone", "location", "headline", "bio", "resumeUrl", "profilePicture"];
     const filteredUpdates = {};
 
     Object.keys(updates).forEach((key) => {
