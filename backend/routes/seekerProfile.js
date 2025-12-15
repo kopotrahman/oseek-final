@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const PDFDocument = require("pdfkit");
 const { JobSeekerProfile } = require("../models");
 const { auth, authorize } = require("../middleware");
 
@@ -567,7 +568,6 @@ router.delete("/education/:id", auth, authorize("seeker"), async (req, res) => {
  */
 router.get("/download-cv", auth, authorize("seeker"), async (req, res) => {
   try {
-    const PDFDocument = require("pdfkit");
     const profile = await JobSeekerProfile.findOne({ user: req.user._id });
 
     if (!profile) {
