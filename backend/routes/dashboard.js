@@ -187,25 +187,24 @@ router.get("/activity", auth, async (req, res) => {
           });
         });
       } else {
-      const jobs = await Job.find({ company: req.user._id });
-      const jobIds = jobs.map((job) => job._id);
-
-      const applications = await Application.find({ job: { $in: jobIds } })
-        .populate("job", "title")
-        .populate("applicant", "name")
-        .sort({ createdAt: -1 })
-        .limit(limit);
-
-      applications.forEach((app) => {
-        activities.push({
-          type: "new_application",
-          action: "received",
-          title: `${app.applicant?.name || "Someone"} applied to ${app.job?.title || "Unknown Job"}`,
-          timestamp: app.createdAt,
-        });
-      });
-
         const jobs = await Job.find({ company: req.user._id });
+        const jobIds = jobs.map((job) => job._id);
+
+        const applications = await Application.find({ job: { $in: jobIds } })
+          .populate("job", "title")
+          .populate("applicant", "name")
+          .sort({ createdAt: -1 })
+          .limit(limit);
+
+        applications.forEach((app) => {
+          activities.push({
+            type: "new_application",
+            action: "received",
+            title: `${app.applicant?.name || "Someone"} applied to ${app.job?.title || "Unknown Job"}`,
+            timestamp: app.createdAt,
+          });
+        });
+
         jobs
           .sort((a, b) => b.createdAt - a.createdAt)
           .slice(0, limit)
