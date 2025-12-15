@@ -291,10 +291,11 @@ export default function JobSeekerProfile() {
     setError("")
     
     try {
+      const headers = getAuthHeaders()
+      delete headers['Content-Type'] // Remove Content-Type for blob response
+      
       const response = await fetch(API_ENDPOINTS.profile.seeker.downloadCV, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        headers: headers
       })
       
       if (response.ok) {

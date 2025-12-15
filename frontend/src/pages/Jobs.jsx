@@ -122,21 +122,29 @@ export default function Jobs() {
   const checkWishlistStatus = async () => {
     if (!isSeeker) return
     
-    const statusChecks = {}
-    for (const job of jobs) {
-      try {
-        const response = await fetch(API_ENDPOINTS.wishlist.check(job._id), {
+    try {
+      // Use Promise.all to check all jobs in parallel instead of sequentially
+      const statusPromises = jobs.map(job =>
+        fetch(API_ENDPOINTS.wishlist.check(job._id), {
           headers: getAuthHeaders(),
         })
-        const data = await response.json()
-        if (response.ok) {
-          statusChecks[job._id] = data.inWishlist || false
-        }
-      } catch (err) {
-        console.error(`Error checking wishlist for job ${job._id}:`, err)
-      }
+        .then(res => res.json())
+        .then(data => ({ jobId: job._id, inWishlist: data.inWishlist || false }))
+        .catch(err => {
+          console.error(`Error checking wishlist for job ${job._id}:`, err)
+          return { jobId: job._id, inWishlist: false }
+        })
+      )
+      
+      const results = await Promise.all(statusPromises)
+      const statusChecks = {}
+      results.forEach(result => {
+        statusChecks[result.jobId] = result.inWishlist
+      })
+      setWishlistStatus(statusChecks)
+    } catch (err) {
+      console.error('Error checking wishlist status:', err)
     }
-    setWishlistStatus(statusChecks)
   }
 
   const toggleWishlist = async (jobId) => {
@@ -365,12 +373,13 @@ export default function Jobs() {
 
   const sendInterviewInvitation = async () => {
     if (!interviewMessage.trim()) {
-      setError("Please enter an interview message")
+      // Show error in modal context
+      setJobFormError("Please enter an interview message")
       return
     }
 
     setSendingInterview(true)
-    setError("")
+    setJobFormError("")
     try {
       const response = await fetch(API_ENDPOINTS.applications.callForInterview(interviewModal.applicationId), {
         method: "POST",
@@ -383,16 +392,17 @@ export default function Jobs() {
         setJobFormSuccess("Interview invitation sent successfully!")
         setInterviewModal({ show: false, applicationId: null, jobId: null })
         setInterviewMessage("")
+        setJobFormError("") // Clear any errors
         // Refresh applications for this job
         if (interviewModal.jobId) {
           fetchJobApplications(interviewModal.jobId)
         }
       } else {
-        setError(data.message || "Failed to send interview invitation")
+        setJobFormError(data.message || "Failed to send interview invitation")
       }
     } catch (err) {
       console.error("Send interview invitation error:", err)
-      setError("Network error. Please try again later.")
+      setJobFormError("Network error. Please try again later.")
     } finally {
       setSendingInterview(false)
     }
@@ -856,6 +866,13 @@ export default function Jobs() {
           <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-md w-full">
             <h2 className="text-2xl font-bold text-[#e0e0ff] mb-4">Call for Interview</h2>
             <p className="text-[#a0a0c0] mb-4">Send an interview invitation to the applicant</p>
+            
+            {jobFormError && interviewModal.show && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                {jobFormError}
+              </div>
+            )}
+            
             <textarea
               value={interviewMessage}
               onChange={(e) => setInterviewMessage(e.target.value)}
@@ -874,6 +891,7 @@ export default function Jobs() {
                 onClick={() => {
                   setInterviewModal({ show: false, applicationId: null, jobId: null })
                   setInterviewMessage("")
+                  setJobFormError("") // Clear errors when closing
                 }}
                 className="flex-1 px-4 py-2 border border-[#2d2d4d] text-[#e0e0ff] rounded-lg font-semibold hover:border-[#0066ff] transition"
               >
