@@ -351,15 +351,24 @@ router.post("/", auth, authorize("company"), async (req, res) => {
     // Send notifications to users who have similar jobs in wishlist (feature 5)
     // Find users who might be interested based on title or skills
     try {
-      const firstWord = title.split(" ")[0];
-      const escapedFirstWord = escapeRegex(firstWord);
-      const similarJobs = await Job.find({
-        $or: [
+      const firstWord = title.trim().split(" ")[0];
+      const query = { _id: { $ne: job._id } };
+      
+      // Only add title regex if firstWord is not empty
+      if (firstWord && firstWord.length > 0) {
+        const escapedFirstWord = escapeRegex(firstWord);
+        query.$or = [
           { title: { $regex: escapedFirstWord, $options: "i" } },
           { skills: { $in: skills || [] } },
-        ],
-        _id: { $ne: job._id },
-      }).limit(10);
+        ];
+      } else if (skills && skills.length > 0) {
+        query.skills = { $in: skills };
+      } else {
+        // Skip notification if no valid search criteria
+        throw new Error("No valid criteria for similar jobs");
+      }
+      
+      const similarJobs = await Job.find(query).limit(10);
 
       const similarJobIds = similarJobs.map((j) => j._id);
       

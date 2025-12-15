@@ -92,7 +92,7 @@ OSEEK Team`;
       <h2 style="color: #2563eb;">Job Alert!</h2>
       <p>Good news! A job you saved in your wishlist is now open for applications.</p>
       <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <h3 style="margin: 0 0 10px 0;">${jobTitle}</h3>
+        <h3 style="margin: 0 0 10px 0;">${he.escape(jobTitle)}</h3>
       </div>
       <p>Apply now before it's too late!</p>
       <a href="${process.env.FRONTEND_URL || "http://localhost:3000"}/jobs/${jobId}" 
@@ -125,8 +125,8 @@ OSEEK Team`;
       <h2 style="color: #2563eb;">Interview Invitation!</h2>
       <p>Congratulations! You've been invited for an interview.</p>
       <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <p><strong>Job Title:</strong> ${jobTitle}</p>
-        <p><strong>Company:</strong> ${companyName}</p>
+        <p><strong>Job Title:</strong> ${he.escape(jobTitle)}</p>
+        <p><strong>Company:</strong> ${he.escape(companyName)}</p>
       </div>
       <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 0;"><strong>Message from the company:</strong></p>
