@@ -17,6 +17,7 @@ const companyProfileSchema = new mongoose.Schema(
     size: { type: String, default: "" },
     founded: { type: String, default: "" },
     logo: { type: String, default: "" },
+    profilePicture: { type: String, default: "" },
   },
   {
     timestamps: true,

@@ -32,6 +32,7 @@ const jobSeekerProfileSchema = new mongoose.Schema(
     education: [educationSchema],
     resumeUrl: { type: String, default: "" },
     profileViews: { type: Number, default: 0 },
+    profilePicture: { type: String, default: "" },
   },
   {
     timestamps: true,

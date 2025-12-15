@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import Header from "../../components/Header"
 import { API_ENDPOINTS, getAuthHeaders } from "../../config/api"
+import { Edit2 } from "lucide-react"
 
 export default function CompanyProfile() {
   const [profile, setProfile] = useState(null)
@@ -77,6 +78,51 @@ export default function CompanyProfile() {
     }
   }
 
+  const handleProfilePictureChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Check file size (limit to 1MB)
+    if (file.size > 1024 * 1024) {
+      setError("Image size should be less than 1MB")
+      return
+    }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      setError("Please select a valid image file")
+      return
+    }
+
+    // Convert to base64
+    const reader = new FileReader()
+    reader.onloadend = async () => {
+      const base64String = reader.result
+      
+      try {
+        const response = await fetch(API_ENDPOINTS.profile.company.update, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ ...profile, profilePicture: base64String }),
+        })
+        const data = await response.json()
+
+        if (response.ok) {
+          setProfile(data)
+          setSuccess("Profile picture updated!")
+          if (timeoutRef.current) clearTimeout(timeoutRef.current)
+          timeoutRef.current = setTimeout(() => setSuccess(""), 3000)
+        } else {
+          setError(data.message || "Failed to update profile picture")
+        }
+      } catch (err) {
+        console.error("Update profile picture error:", err)
+        setError("Network error. Please try again later.")
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#0f0f1e] via-[#1a1a2e] to-[#0f0f1e]">
@@ -105,6 +151,33 @@ export default function CompanyProfile() {
 
         <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 neon-glow">
           <h1 className="text-4xl font-bold text-[#e0e0ff] mb-8">Company Profile</h1>
+
+          {/* Profile Picture */}
+          <div className="mb-8 flex flex-col items-center">
+            <div className="relative group">
+              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-[#0066ff] bg-[#0f0f1e] flex items-center justify-center">
+                {profile?.profilePicture ? (
+                  <img 
+                    src={profile.profilePicture} 
+                    alt="Company Logo" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-4xl text-[#a0a0c0]">🏢</span>
+                )}
+              </div>
+              <label className="absolute bottom-0 right-0 bg-[#0066ff] hover:bg-[#0052cc] rounded-full p-2 cursor-pointer transition">
+                <Edit2 size={16} className="text-white" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProfilePictureChange}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            <p className="text-xs text-[#a0a0c0] mt-2">Click to upload company logo (max 1MB)</p>
+          </div>
 
           <div className="bg-[#0f0f1e] rounded-lg p-6 space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
