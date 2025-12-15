@@ -160,6 +160,11 @@ export default function Signup() {
               {loading ? "Creating account..." : "Sign Up"}
             </button>
           </form>
+          <button onClick={()=>{
+            navigate("?role=" + (role === "company" ? "seeker" : "company"));
+          }}
+          className="w-full h-10 rounded-md bg-blue-400 font-semibold mb-5"
+          >Join as a {role=="company"?"Seeker":"Company"}</button>
 
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
@@ -169,6 +174,7 @@ export default function Signup() {
               <span className="px-2 bg-[#16213e] text-[#a0a0c0]">Or sign up with</span>
             </div>
           </div>
+
 
           <div className="space-y-3">
             <button className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg py-2 flex items-center justify-center gap-2 text-[#e0e0ff] hover:border-[#0066ff] transition">

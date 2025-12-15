@@ -104,6 +104,11 @@ export default function Login() {
               {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
+          <button onClick={()=>{
+            navigate("?role=" + (role === "company" ? "seeker" : "company"));
+          }}
+          className="w-full h-10 rounded-md bg-blue-400 font-semibold mb-5"
+          >Login as {role=="company"?"Seeker":"Company"}</button>
 
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
@@ -114,20 +119,16 @@ export default function Login() {
             </div>
           </div>
 
-          <button onClick={()=>{
-            navigate("?role=" + (role === "company" ? "seeker" : "company"));
-          }}
-          className="w-full h-10 rounded-md bg-blue-400 font-semibold mb-5"
-          >Login as {role=="company"?"Seeker":"Company"}</button>
 
-          {/* <div className="space-y-3">
+
+          { <div className="space-y-3">
             <button className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg py-2 flex items-center justify-center gap-2 text-[#e0e0ff] hover:border-[#0066ff] transition">
               <Mail size={20} /> Google
             </button>
             <button className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg py-2 flex items-center justify-center gap-2 text-[#e0e0ff] hover:border-[#0066ff] transition">
               <Github size={20} /> LinkedIn
             </button>
-          </div> */}
+          </div> }
 
           <p className="text-center text-[#a0a0c0] mt-8">
             Don't have an account?{" "}

@@ -78,12 +78,7 @@ export default function Header() {
               >
                 Sign Up
               </button>
-              <button
-              onClick={() => navigate("/auth/signup?role=company")}
-                className="px-4 py-2 bg-primary text-background rounded-lg font-semibold hover:bg-primary-dark transition"
-              >
-                Join as a Company
-              </button>
+              
             </>
           )}
         </nav>
