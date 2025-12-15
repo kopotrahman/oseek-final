@@ -132,9 +132,17 @@ router.delete("/seekers/:id", auth, authorize("admin"), async (req, res) => {
       return res.status(404).json({ message: "Job seeker not found" });
     }
 
-    // Delete the associated user account as well
-    await User.findByIdAndDelete(seeker.user);
+    // Delete the profile first, then the user account
+    // If user deletion fails, at least the profile is removed
+    const userId = seeker.user;
     await JobSeekerProfile.findByIdAndDelete(req.params.id);
+    
+    try {
+      await User.findByIdAndDelete(userId);
+    } catch (userDeleteError) {
+      console.error("Error deleting user account:", userDeleteError);
+      // Continue even if user deletion fails
+    }
 
     res.json({
       success: true,
@@ -177,9 +185,17 @@ router.delete("/companies/:id", auth, authorize("admin"), async (req, res) => {
       return res.status(404).json({ message: "Company not found" });
     }
 
-    // Delete the associated user account as well
-    await User.findByIdAndDelete(company.user);
+    // Delete the profile first, then the user account
+    // If user deletion fails, at least the profile is removed
+    const userId = company.user;
     await CompanyProfile.findByIdAndDelete(req.params.id);
+    
+    try {
+      await User.findByIdAndDelete(userId);
+    } catch (userDeleteError) {
+      console.error("Error deleting user account:", userDeleteError);
+      // Continue even if user deletion fails
+    }
 
     res.json({
       success: true,
