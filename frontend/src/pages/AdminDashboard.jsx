@@ -7,12 +7,14 @@ import { API_ENDPOINTS, getAuthHeaders } from "../config/api"
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const user = JSON.parse(localStorage.getItem("user") || "{}")
-  const [activeTab, setActiveTab] = useState("seekers")
+  const [activeTab, setActiveTab] = useState("users")
   const [seekers, setSeekers] = useState([])
   const [companies, setCompanies] = useState([])
+  const [users, setUsers] = useState([])
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [updatingRole, setUpdatingRole] = useState(null)
 
   useEffect(() => {
     // Check if user is admin
@@ -27,9 +29,14 @@ export default function AdminDashboard() {
     setLoading(true)
     setError("")
     try {
-      const endpoint = activeTab === "seekers" 
-        ? API_ENDPOINTS.admin.seekers 
-        : API_ENDPOINTS.admin.companies
+      let endpoint
+      if (activeTab === "users") {
+        endpoint = API_ENDPOINTS.admin.users
+      } else if (activeTab === "seekers") {
+        endpoint = API_ENDPOINTS.admin.seekers
+      } else {
+        endpoint = API_ENDPOINTS.admin.companies
+      }
       
       const response = await fetch(endpoint, {
         headers: getAuthHeaders(),
@@ -37,7 +44,9 @@ export default function AdminDashboard() {
       const data = await response.json()
 
       if (response.ok) {
-        if (activeTab === "seekers") {
+        if (activeTab === "users") {
+          setUsers(data.users || [])
+        } else if (activeTab === "seekers") {
           setSeekers(data.seekers || [])
         } else {
           setCompanies(data.companies || [])
@@ -61,7 +70,9 @@ export default function AdminDashboard() {
     try {
       const endpoint = type === "seeker" 
         ? API_ENDPOINTS.admin.deleteSeeker(id)
-        : API_ENDPOINTS.admin.deleteCompany(id)
+        : type === "company"
+        ? API_ENDPOINTS.admin.deleteCompany(id)
+        : API_ENDPOINTS.admin.deleteUser(id)
 
       const response = await fetch(endpoint, {
         method: "DELETE",
@@ -79,6 +90,40 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error("Delete error:", err)
       alert("Network error. Please try again later.")
+    }
+  }
+
+  const handleRoleUpdate = async (userId, newRole, currentUserEmail) => {
+    // Prevent changing own role
+    if (currentUserEmail === user.email) {
+      alert("You cannot change your own role")
+      return
+    }
+
+    if (!window.confirm(`Are you sure you want to change this user's role to ${newRole}?`)) {
+      return
+    }
+
+    setUpdatingRole(userId)
+    try {
+      const response = await fetch(API_ENDPOINTS.admin.updateUserRole(userId), {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ role: newRole }),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        fetchData()
+        alert(data.message || "Role updated successfully")
+      } else {
+        alert(data.message || "Failed to update role")
+      }
+    } catch (err) {
+      console.error("Update role error:", err)
+      alert("Network error. Please try again later.")
+    } finally {
+      setUpdatingRole(null)
     }
   }
 
@@ -116,6 +161,72 @@ export default function AdminDashboard() {
       setLoading(false)
     }
   }
+
+  const renderUsers = () => (
+    <div className="space-y-4">
+      {users.length > 0 ? (
+        users.map((userData) => (
+          <div
+            key={userData._id}
+            className="bg-[#16213e] border border-[#2d2d4d] rounded-xl p-6 neon-glow hover:border-[#0066ff] transition"
+          >
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-[#e0e0ff] mb-2">
+                  {userData.name || "No Name"}
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-[#a0a0c0]">
+                    <Mail size={16} />
+                    <span>{userData.email || "No email"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-3 py-1 rounded text-sm font-medium ${
+                      userData.role === 'admin' ? 'bg-red-500/20 text-red-400' :
+                      userData.role === 'company' ? 'bg-blue-500/20 text-blue-400' :
+                      'bg-green-500/20 text-green-400'
+                    }`}>
+                      {userData.role}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[#a0a0c0]">
+                    <Calendar size={16} />
+                    <span>Joined: {new Date(userData.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="ml-4 flex flex-col gap-2">
+                <select
+                  value={userData.role}
+                  onChange={(e) => handleRoleUpdate(userData._id, e.target.value, userData.email)}
+                  disabled={updatingRole === userData._id || userData.email === user.email}
+                  className="px-3 py-2 bg-[#0f0f1e] border border-[#2d2d4d] text-[#e0e0ff] rounded-lg focus:outline-none focus:border-[#0066ff] disabled:opacity-50"
+                >
+                  <option value="seeker">Seeker</option>
+                  <option value="company">Company</option>
+                  <option value="admin">Admin</option>
+                </select>
+                {userData.email !== user.email && (
+                  <button
+                    onClick={() => handleDelete(userData._id, "user")}
+                    className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition"
+                    title="Delete user"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))
+      ) : (
+        <div className="text-center py-12">
+          <Users size={48} className="mx-auto text-[#6d6d8f] mb-4" />
+          <p className="text-[#a0a0c0]">No users found</p>
+        </div>
+      )}
+    </div>
+  )
 
   const renderSeekers = () => (
     <div className="space-y-4">
@@ -293,6 +404,17 @@ export default function AdminDashboard() {
         {/* Tabs */}
         <div className="flex gap-4 mb-6">
           <button
+            onClick={() => setActiveTab("users")}
+            className={`px-6 py-3 rounded-lg font-semibold transition ${
+              activeTab === "users"
+                ? "bg-[#0066ff] text-white"
+                : "bg-[#16213e] text-[#a0a0c0] border border-[#2d2d4d] hover:border-[#0066ff]"
+            }`}
+          >
+            <Users size={20} className="inline mr-2" />
+            All Users
+          </button>
+          <button
             onClick={() => setActiveTab("seekers")}
             className={`px-6 py-3 rounded-lg font-semibold transition ${
               activeTab === "seekers"
@@ -359,7 +481,7 @@ export default function AdminDashboard() {
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#0066ff]"></div>
           </div>
         ) : (
-          activeTab === "seekers" ? renderSeekers() : renderCompanies()
+          activeTab === "users" ? renderUsers() : activeTab === "seekers" ? renderSeekers() : renderCompanies()
         )}
       </div>
     </div>
