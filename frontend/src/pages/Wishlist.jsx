@@ -72,7 +72,7 @@ export default function Wishlist() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0f0f1e] via-[#1a1a2e] to-[#0f0f1e]">
+    <div className="min-h-screen bg-linear-to-b from-[#0f0f1e] via-[#1a1a2e] to-[#0f0f1e]">
       <Header />
 
       <div className="max-w-6xl mx-auto py-12 px-4">

@@ -6,7 +6,7 @@ export default function Landing() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0f0f1e] via-[#1a1a2e] to-[#0f0f1e]">
+    <div className="min-h-screen `bg-gradient-to-b` from-[#0f0f1e] via-[#1a1a2e] to-[#0f0f1e]">
       <Header />
 
       {/* Hero Section */}
@@ -45,7 +45,7 @@ export default function Landing() {
             {/* Hero Illustration */}
             <div className="hidden md:block">
               <div className="relative h-96">
-                <div className="absolute inset-0 bg-gradient-to-r from-[#0066ff]/20 to-[#00d9ff]/20 rounded-2xl blur-3xl"></div>
+                <div className="absolute inset-0 bg-linear-to-r from-[#0066ff]/20 to-[#00d9ff]/20 rounded-2xl blur-3xl"></div>
                 <div className="relative bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 neon-glow">
                   <div className="space-y-4">
                     <div className="h-4 bg-[#2d2d4d] rounded w-3/4"></div>

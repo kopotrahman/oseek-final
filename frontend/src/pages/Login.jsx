@@ -55,7 +55,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0f0f1e] via-[#1a1a2e] to-[#0f0f1e]">
+    <div className="min-h-screen bg-linear-to-b from-[#0f0f1e] via-[#1a1a2e] to-[#0f0f1e]">
       <Header />
       <div className="flex items-center justify-center py-20 px-4">
         <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-md w-full neon-glow">
