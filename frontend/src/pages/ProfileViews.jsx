@@ -23,17 +23,33 @@ export default function ProfileViews() {
     setLoading(true)
     setError("")
     try {
-      // TODO: Implement backend API endpoint for profile views
-      // Backend should track when users view a profile and store viewer information
-      
-      // Simulated data for demonstration
-      setTimeout(() => {
-        setViews([])
-        setLoading(false)
-      }, 500)
+      const response = await fetch(API_ENDPOINTS.profile.seeker.getViews, {
+        headers: getAuthHeaders(),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        // Transform the data to match the UI expectations
+        const transformedViews = data.map(view => ({
+          _id: view._id,
+          viewedAt: view.viewedAt,
+          viewer: {
+            _id: view.viewer._id,
+            name: view.viewerProfile?.companyName || view.viewerProfile?.fullName || view.viewer.name,
+            headline: view.viewerProfile?.headline || null,
+            company: view.viewerProfile?.companyName || null,
+            location: view.viewerProfile?.location || null,
+            profilePicture: view.viewerProfile?.profilePicture || null,
+          }
+        }))
+        setViews(transformedViews)
+      } else {
+        setError(data.message || "Failed to fetch profile views")
+      }
     } catch (err) {
       console.error("Fetch profile views error:", err)
       setError("Network error. Please try again later.")
+    } finally {
       setLoading(false)
     }
   }

@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { Application, Job, JobSeekerProfile, Wishlist, ActivityLog } = require("../models");
+const { Application, Job, JobSeekerProfile, Wishlist, ActivityLog, ProfileView } = require("../models");
 const { auth } = require("../middleware");
 
 /**
@@ -86,8 +86,11 @@ router.get("/stats", auth, async (req, res) => {
         timestamp: app.createdAt,
       }));
 
+      // Get actual profile view count from ProfileView collection
+      const profileViewCount = await ProfileView.countDocuments({ profile: req.user._id });
+
       res.json({
-        profileViews: profile?.profileViews || 0,
+        profileViews: profileViewCount,
         connections: connectionCount, 
         applications: applicationCount,
         recentActivity,
