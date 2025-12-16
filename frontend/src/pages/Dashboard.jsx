@@ -157,7 +157,7 @@ export default function Dashboard() {
           </div>
         ) : recommendations.length > 0 ? (
           <div className="space-y-4">
-            {recommendations.map((rec, idx) => {
+            {recommendations.map((rec) => {
               const job = rec.job
               return (
                 <div
