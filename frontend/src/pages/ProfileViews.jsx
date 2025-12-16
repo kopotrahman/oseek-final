@@ -23,12 +23,8 @@ export default function ProfileViews() {
     setLoading(true)
     setError("")
     try {
-      // For now, we'll simulate profile views data
-      // In a real implementation, this would call an API endpoint
-      // const response = await fetch(`${API_ENDPOINTS.profile.seeker}/views`, {
-      //   headers: getAuthHeaders(),
-      // })
-      // const data = await response.json()
+      // TODO: Implement backend API endpoint for profile views
+      // Backend should track when users view a profile and store viewer information
       
       // Simulated data for demonstration
       setTimeout(() => {

@@ -157,8 +157,8 @@ export default function Dashboard() {
           </div>
         ) : recommendations.length > 0 ? (
           <div className="space-y-4">
-            {recommendations.map((rec) => {
-              const job = rec.job
+            {recommendations.map((recommendation) => {
+              const job = recommendation.job
               return (
                 <div
                   key={job._id}
@@ -187,7 +187,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-right">
                       <div className="text-[#00d9ff] font-bold text-lg">
-                        {Math.round(rec.score * 100)}%
+                        {Math.round(recommendation.score * 100)}%
                       </div>
                       <div className="text-[#a0a0c0] text-xs">Match</div>
                     </div>
@@ -197,19 +197,19 @@ export default function Dashboard() {
                   <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-[#2d2d4d]">
                     <div className="text-center">
                       <div className="text-[#a0a0c0] text-xs mb-1">Skills</div>
-                      <div className="text-[#e0e0ff] text-sm font-semibold">{rec.breakdown.skillMatch}%</div>
+                      <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown.skillMatch}%</div>
                     </div>
                     <div className="text-center">
                       <div className="text-[#a0a0c0] text-xs mb-1">Experience</div>
-                      <div className="text-[#e0e0ff] text-sm font-semibold">{rec.breakdown.experienceMatch}%</div>
+                      <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown.experienceMatch}%</div>
                     </div>
                     <div className="text-center">
                       <div className="text-[#a0a0c0] text-xs mb-1">Location</div>
-                      <div className="text-[#e0e0ff] text-sm font-semibold">{rec.breakdown.locationMatch}%</div>
+                      <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown.locationMatch}%</div>
                     </div>
                     <div className="text-center">
                       <div className="text-[#a0a0c0] text-xs mb-1">Keywords</div>
-                      <div className="text-[#e0e0ff] text-sm font-semibold">{rec.breakdown.keywordMatch}%</div>
+                      <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown.keywordMatch}%</div>
                     </div>
                   </div>
                 </div>
