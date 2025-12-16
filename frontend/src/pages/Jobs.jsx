@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import Header from "../components/Header"
 import { API_ENDPOINTS, getAuthHeaders } from "../config/api"
-import { MapPin, Briefcase, DollarSign, Clock, Heart, ChevronDown, ChevronUp } from "lucide-react"
+import { MapPin, Briefcase, DollarSign, Clock, Heart, ChevronDown, ChevronUp, Sparkles } from "lucide-react"
 
 export default function Jobs() {
   const [q, setQ] = useState("")
@@ -46,6 +46,8 @@ export default function Jobs() {
   const [profileModal, setProfileModal] = useState({ show: false, profileId: null, profile: null })
   const [loadingProfile, setLoadingProfile] = useState(false)
   const [isPostJobExpanded, setIsPostJobExpanded] = useState(false)
+  const [recommendations, setRecommendations] = useState([])
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false)
   
   // Refs for timeout cleanup
   const successTimeoutRef = useRef(null)
@@ -111,6 +113,24 @@ export default function Jobs() {
     }
   }, [isCompany])
 
+  const fetchRecommendations = async () => {
+    setLoadingRecommendations(true)
+    try {
+      const response = await fetch(`${API_ENDPOINTS.jobs.recommendations}?limit=5`, {
+        headers: getAuthHeaders(),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setRecommendations(data.recommendations || [])
+      }
+    } catch (err) {
+      console.error("Fetch recommendations error:", err)
+    } finally {
+      setLoadingRecommendations(false)
+    }
+  }
+
   useEffect(() => {
     fetchJobs(q, page)
   }, [q, page]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -118,6 +138,12 @@ export default function Jobs() {
   useEffect(() => {
     fetchMyJobs()
   }, [fetchMyJobs])
+
+  useEffect(() => {
+    if (isSeeker) {
+      fetchRecommendations()
+    }
+  }, [isSeeker])
 
   // Check wishlist status and applied status for all jobs when jobs change
   useEffect(() => {
@@ -1020,12 +1046,131 @@ export default function Jobs() {
           </div>
         )}
 
+        {/* AI-Powered Job Recommendations for Seekers */}
+        {isSeeker && (
+          <div className="mb-10 bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 neon-glow">
+            <div className="flex items-center gap-3 mb-6">
+              <Sparkles size={28} className="text-[#00d9ff]" />
+              <h2 className="text-2xl font-bold text-[#e0e0ff]">AI-Powered Recommendations</h2>
+            </div>
+
+            {loadingRecommendations ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#0066ff]"></div>
+              </div>
+            ) : recommendations.length > 0 ? (
+              <div className="space-y-4">
+                {recommendations.map((recommendation) => {
+                  const job = recommendation.job
+                  return (
+                    <div
+                      key={job._id}
+                      className="bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg p-5 hover:border-[#0066ff] transition"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-[#e0e0ff] mb-1">{job.title}</h3>
+                          <p className="text-[#00d9ff] font-medium mb-2">{job.companyName}</p>
+                          <div className="flex flex-wrap gap-4 text-[#a0a0c0] text-sm">
+                            <span className="flex items-center gap-1">
+                              <MapPin size={14} />
+                              {job.location}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Briefcase size={14} />
+                              {job.type}
+                            </span>
+                            {job.salary?.min && (
+                              <span className="flex items-center gap-1">
+                                <DollarSign size={14} />
+                                {job.salary.min}-{job.salary.max} {job.salary.currency}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right ml-4">
+                          <div className="text-[#00d9ff] font-bold text-lg">
+                            {Math.round(recommendation.score * 100)}%
+                          </div>
+                          <div className="text-[#a0a0c0] text-xs">Match</div>
+                        </div>
+                      </div>
+
+                      {/* Match Breakdown */}
+                      <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-[#2d2d4d]">
+                        <div className="text-center">
+                          <div className="text-[#a0a0c0] text-xs mb-1">Skills</div>
+                          <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown.skillMatch}%</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-[#a0a0c0] text-xs mb-1">Location</div>
+                          <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown.locationMatch}%</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-[#a0a0c0] text-xs mb-1">Experience</div>
+                          <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown.experienceMatch}%</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-[#a0a0c0] text-xs mb-1">Type</div>
+                          <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown.typeMatch}%</div>
+                        </div>
+                      </div>
+
+                      {/* Apply Button */}
+                      <div className="mt-4 flex gap-2">
+                        {appliedJobs[job._id]?.applied ? (
+                          <button
+                            disabled
+                            className="px-4 py-2 bg-green-600/50 text-white rounded-lg font-semibold cursor-not-allowed"
+                          >
+                            Applied
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleApply(job._id)}
+                            disabled={applying === job._id}
+                            className="px-4 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition disabled:opacity-50"
+                          >
+                            {applying === job._id ? "Applying..." : "Apply Now"}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => toggleWishlist(job._id)}
+                          disabled={togglingWishlist === job._id}
+                          className="flex items-center justify-center px-4 py-2 border border-[#2d2d4d] rounded-lg hover:border-[#ff1744] transition disabled:opacity-50"
+                          title={wishlistStatus[job._id] ? "Remove from wishlist" : "Add to wishlist"}
+                        >
+                          <Heart
+                            size={20}
+                            className={wishlistStatus[job._id] ? "text-[#ff1744]" : "text-[#a0a0c0]"}
+                            fill={wishlistStatus[job._id] ? "#ff1744" : "none"}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Sparkles size={48} className="text-[#2d2d4d] mx-auto mb-4" />
+                <p className="text-[#a0a0c0]">Complete your profile to get personalized job recommendations</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* All Jobs Section - Separated from My Jobs */}
         <div className="mt-10">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-            <h2 className="text-2xl font-bold text-[#e0e0ff]">
-              {isCompany ? "Browse All Jobs" : "Available Jobs"}
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold text-[#e0e0ff]">
+                {isCompany ? "Browse All Jobs" : "Available Jobs"}
+              </h2>
+              <span className="px-3 py-1 bg-[#0066ff]/20 text-[#0066ff] rounded-full text-sm font-semibold">
+                {paginationInfo.total || jobs.length} {(paginationInfo.total || jobs.length) === 1 ? 'job' : 'jobs'}
+              </span>
+            </div>
             {isCompany && (
               <p className="text-[#a0a0c0] text-sm">
                 Explore job openings from other companies in the market.
