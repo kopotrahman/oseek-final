@@ -2,13 +2,31 @@
 
 ## Overview
 
-The OSEEK job portal now includes an intelligent recommendation system that matches job seekers with relevant job opportunities using machine learning algorithms and natural language processing techniques.
+The OSEEK job portal now includes an intelligent recommendation system powered by **Google's Gemini AI** that matches job seekers with relevant job opportunities using advanced AI and natural language processing.
 
 ## How It Works
 
-### Algorithm Components
+### Gemini AI Integration
 
-The recommendation system uses a **weighted scoring algorithm** that considers multiple factors:
+The recommendation system now leverages **Google's Gemini AI** (gemini-1.5-flash model) to provide intelligent job matching:
+
+1. **Data Collection**
+   - User profile data: skills, experience, education, location, headline, bio
+   - Available job postings: title, description, skills, location, experience requirements
+
+2. **AI Processing**
+   - Sends user profile and job listings to Gemini AI
+   - Gemini analyzes semantic relationships between user qualifications and job requirements
+   - AI considers context, synonyms, and implicit skill relationships
+   - Returns ranked job recommendations with match scores and reasoning
+
+3. **Fallback Algorithm**
+   - If Gemini API is unavailable or not configured, system falls back to traditional weighted scoring
+   - Ensures service reliability even without API key
+
+### Traditional Algorithm (Fallback)
+
+When Gemini API is not available, the system uses a **weighted scoring algorithm** that considers multiple factors:
 
 1. **Skill Similarity (40% weight)**
    - Uses Jaccard similarity coefficient to compare user skills with job requirements
@@ -118,9 +136,18 @@ If no recommendations are available:
 
 ## Configuration
 
-### Weights
+### Environment Variables
 
-The scoring weights can be adjusted in `recommendationService.js`:
+**Required for Gemini AI:**
+```bash
+GEMINI_API_KEY=your-gemini-api-key-here
+```
+
+Add this to your `.env` file in the backend directory. Get your API key from [Google AI Studio](https://makersuite.google.com/app/apikey).
+
+### Fallback Weights (Traditional Algorithm)
+
+When Gemini is not available, the scoring weights can be adjusted in `recommendationService.js`:
 
 ```javascript
 const totalScore =
@@ -133,9 +160,13 @@ const totalScore =
 
 ### Minimum Score Threshold
 
-Jobs with scores below 0.2 (20%) are filtered out:
+Jobs with scores below 0.3 (30% for Gemini) or 0.2 (20% for fallback) are filtered out:
 
 ```javascript
+// Gemini
+const relevantJobs = recommendations.filter(rec => rec.matchScore >= 0.3);
+
+// Fallback
 const relevantJobs = jobsWithScores.filter(item => item.score >= 0.2);
 ```
 
@@ -266,11 +297,13 @@ Potential improvements for future versions:
 
 ## Technical Implementation
 
-### Files Modified
+### Files Modified/Created
 
 **Backend:**
-- `backend/utils/recommendationService.js` - Core algorithm
-- `backend/routes/jobs.js` - API endpoint
+- `backend/utils/geminiRecommendationService.js` - **NEW** Gemini AI integration
+- `backend/utils/recommendationService.js` - Updated to use Gemini with fallback
+- `backend/routes/jobs.js` - API endpoint (unchanged)
+- `backend/.env.example` - Added GEMINI_API_KEY configuration
 
 **Frontend:**
 - `frontend/src/pages/Dashboard.jsx` - UI display
@@ -278,7 +311,10 @@ Potential improvements for future versions:
 
 ### Dependencies
 
-No additional dependencies required. Uses existing:
+**New Dependencies:**
+- `@google/generative-ai` (v0.24.1) - Google Gemini AI SDK
+
+**Existing Dependencies:**
 - Mongoose for database queries
 - Express for API routing
 - React for UI components
@@ -335,8 +371,41 @@ The AI-powered recommendation system significantly improves the job search exper
 
 For questions or issues, please contact the development team.
 
+## Gemini AI Features
+
+### Advantages Over Traditional Algorithm
+
+1. **Semantic Understanding**
+   - Understands context and meaning, not just keyword matching
+   - Recognizes related skills (e.g., React and Next.js, Python and Django)
+   - Interprets job descriptions in natural language
+
+2. **Intelligent Reasoning**
+   - Provides explanations for each recommendation
+   - Considers implicit qualifications and transferable skills
+   - Better handles edge cases and ambiguous data
+
+3. **Continuous Improvement**
+   - Benefits from Google's ongoing model improvements
+   - Stays current with industry trends and terminology
+   - No manual weight tuning required
+
+4. **Flexibility**
+   - Adapts to various job types and industries
+   - Handles incomplete or sparse profile data better
+   - More robust to data quality issues
+
+### API Usage Example
+
+```javascript
+const { getRecommendedJobs } = require('./utils/recommendationService');
+
+// Will automatically use Gemini if GEMINI_API_KEY is set
+const recommendations = await getRecommendedJobs(userId, 10);
+```
+
 ---
 
-**Version:** 1.0  
+**Version:** 2.0 (Gemini AI Integration)  
 **Last Updated:** December 2024  
-**Status:** Production Ready ✅
+**Status:** Production Ready with AI ✅
