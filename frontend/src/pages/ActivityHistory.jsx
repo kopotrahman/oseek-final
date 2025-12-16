@@ -41,8 +41,12 @@ export default function ActivityHistory() {
   const getActivityIcon = (type) => {
     switch (type) {
       case "application_submitted":
+      case "application_received":
         return <FileText size={20} className="text-[#0066ff]" />
       case "application_updated":
+      case "applicant_shortlisted":
+      case "applicant_rejected":
+      case "applicant_hired":
         return <CheckCircle size={20} className="text-[#00d9ff]" />
       case "job_saved":
         return <Heart size={20} className="text-[#ff1744]" />
@@ -51,6 +55,8 @@ export default function ActivityHistory() {
       case "interview_scheduled":
         return <Calendar size={20} className="text-[#ffa500]" />
       case "job_posted":
+      case "job_updated":
+      case "job_closed":
         return <Briefcase size={20} className="text-[#00d9ff]" />
       case "profile_updated":
         return <FileText size={20} className="text-[#00d9ff]" />
@@ -62,14 +68,20 @@ export default function ActivityHistory() {
   const getActivityColor = (type) => {
     switch (type) {
       case "application_submitted":
+      case "application_received":
         return "border-[#0066ff]"
       case "application_updated":
+      case "applicant_shortlisted":
+      case "applicant_rejected":
+      case "applicant_hired":
         return "border-[#00d9ff]"
       case "job_saved":
         return "border-[#ff1744]"
       case "interview_scheduled":
         return "border-[#ffa500]"
       case "job_posted":
+      case "job_updated":
+      case "job_closed":
         return "border-[#00d9ff]"
       default:
         return "border-[#2d2d4d]"

@@ -62,6 +62,15 @@ export const API_ENDPOINTS = {
     users: `${API_BASE_URL}/admin/users`,
     updateUserRole: (id) => `${API_BASE_URL}/admin/users/${id}/role`,
     deleteUser: (id) => `${API_BASE_URL}/admin/users/${id}`,
+    jobs: `${API_BASE_URL}/admin/jobs`,
+    deleteJob: (id) => `${API_BASE_URL}/admin/jobs/${id}`,
+    sendFeedback: `${API_BASE_URL}/admin/feedback`,
+  },
+  notifications: {
+    list: `${API_BASE_URL}/notifications`,
+    markAsRead: (id) => `${API_BASE_URL}/notifications/${id}/read`,
+    markAllAsRead: `${API_BASE_URL}/notifications/read-all`,
+    delete: (id) => `${API_BASE_URL}/notifications/${id}`,
   },
   wishlist: {
     list: `${API_BASE_URL}/wishlist`,

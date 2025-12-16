@@ -1,6 +1,7 @@
-import { LogOut, Briefcase, Heart, Clock } from "lucide-react";
-import { useSyncExternalStore, useCallback } from "react";
+import { LogOut, Briefcase, Heart, Clock, Bell } from "lucide-react";
+import { useSyncExternalStore, useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_ENDPOINTS, getAuthHeaders } from "../../config/api";
 
 function subscribeToStorage(callback) {
   window.addEventListener("storage", callback);
@@ -26,6 +27,32 @@ export default function Header() {
   const user = token ? JSON.parse(localStorage.getItem("user") || "{}") : null;
   const isAdmin = user?.role === "admin";
   const isSeeker = user?.role === "seeker";
+  const isCompany = user?.role === "company";
+  
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (token && (isCompany || isAdmin)) {
+      fetchUnreadCount();
+      // Poll for new notifications every 30 seconds
+      const interval = setInterval(fetchUnreadCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [token, isCompany, isAdmin]);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await fetch(`${API_ENDPOINTS.notifications.list}?unreadOnly=true`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setUnreadCount(data.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error("Failed to fetch unread count:", error);
+    }
+  };
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem("token");
@@ -70,6 +97,19 @@ export default function Header() {
                 >
                   <Clock className="w-4 h-4" />
                   Activity
+                </button>
+              )}
+              {(isCompany || isAdmin) && (
+                <button
+                  onClick={() => navigate("/notifications")}
+                  className="relative flex items-center gap-2 text-text-secondary hover:text-text transition"
+                >
+                  <Bell className="w-4 h-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
                 </button>
               )}
               <button
