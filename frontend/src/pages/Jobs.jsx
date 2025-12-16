@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import Header from "../components/Header"
 import { API_ENDPOINTS, getAuthHeaders } from "../config/api"
-import { MapPin, Briefcase, DollarSign, Clock, Heart, ChevronDown, ChevronUp, Sparkles } from "lucide-react"
+import { MapPin, Briefcase, DollarSign, Clock, Heart, ChevronDown, ChevronUp, Sparkles, RefreshCw } from "lucide-react"
 
 export default function Jobs() {
   const navigate = useNavigate()
@@ -448,6 +448,7 @@ export default function Jobs() {
       description: job.description || "",
       location: job.location || "",
       type: job.type || "full-time",
+      status: job.status || "open",
       salaryMin: job.salary?.min || "",
       salaryMax: job.salary?.max || "",
       salaryCurrency: job.salary?.currency || "USD",
@@ -481,6 +482,7 @@ export default function Jobs() {
       description: editJobForm.description.trim(),
       location: editJobForm.location.trim(),
       type: editJobForm.type,
+      status: editJobForm.status,
       experience: editJobForm.experience || undefined,
       salary,
       skills: editJobForm.skills
@@ -521,6 +523,46 @@ export default function Jobs() {
     setEditingJobId(null)
     setEditJobForm({})
     setJobFormError("")
+  }
+
+  const handleDeleteJob = async (jobId, jobTitle) => {
+    // Sanitize job title for display in confirm dialog to prevent XSS
+    const sanitizedTitle = jobTitle.replace(/[<>]/g, '');
+    if (!window.confirm(`Are you sure you want to delete "${sanitizedTitle}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(API_ENDPOINTS.jobs.delete(jobId), {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setJobFormSuccess("Job deleted successfully!")
+        fetchMyJobs()
+        // Clear success message after 3 seconds
+        if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
+        successTimeoutRef.current = setTimeout(() => {
+          setJobFormSuccess("")
+        }, 3000)
+      } else {
+        setJobFormError(data.message || "Failed to delete job")
+        // Clear error message after 5 seconds
+        if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current)
+        errorTimeoutRef.current = setTimeout(() => {
+          setJobFormError("")
+        }, 5000)
+      }
+    } catch (err) {
+      console.error("Delete job error:", err)
+      setJobFormError("Network error. Please try again later.")
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current)
+      errorTimeoutRef.current = setTimeout(() => {
+        setJobFormError("")
+      }, 5000)
+    }
   }
 
   const viewApplicantProfile = async (profileId) => {
@@ -933,6 +975,12 @@ export default function Jobs() {
                           >
                             {expandedJobId === job._id ? "Hide applicants" : "View applicants"}
                           </button>
+                          <button
+                            onClick={() => handleDeleteJob(job._id, job.title)}
+                            className="px-3 py-1 border border-red-500/50 text-red-400 rounded-lg font-semibold hover:bg-red-500/20 transition"
+                          >
+                            Delete Job
+                          </button>
                           {job.applicationsCount > 0 && (
                             <button
                               onClick={() => setBulkEmailModal({ show: true, jobId: job._id })}
@@ -1051,9 +1099,20 @@ export default function Jobs() {
         {/* AI-Powered Job Recommendations for Seekers */}
         {isSeeker && (
           <div className="mb-10 bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 neon-glow">
-            <div className="flex items-center gap-3 mb-6">
-              <Sparkles size={28} className="text-[#00d9ff]" />
-              <h2 className="text-2xl font-bold text-[#e0e0ff]">AI-Powered Recommendations</h2>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <Sparkles size={28} className="text-[#00d9ff]" />
+                <h2 className="text-2xl font-bold text-[#e0e0ff]">AI-Powered Recommendations</h2>
+              </div>
+              <button
+                onClick={fetchRecommendations}
+                disabled={loadingRecommendations}
+                className="flex items-center gap-2 px-4 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Refresh recommendations"
+              >
+                <RefreshCw size={18} className={loadingRecommendations ? "animate-spin" : ""} />
+                Refresh
+              </button>
             </div>
 
             {loadingRecommendations ? (
@@ -1316,8 +1375,8 @@ export default function Jobs() {
 
       {/* Interview Invitation Modal */}
       {interviewModal.show && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-md w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto">
+          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-md w-full m-4 my-8">
             <h2 className="text-2xl font-bold text-[#e0e0ff] mb-4">Call for Interview</h2>
             <p className="text-[#a0a0c0] mb-4">Send an interview invitation to the applicant</p>
             
@@ -1358,8 +1417,8 @@ export default function Jobs() {
 
       {/* Bulk Email Modal */}
       {bulkEmailModal.show && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-lg w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto">
+          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-lg w-full m-4 my-8">
             <h2 className="text-2xl font-bold text-[#e0e0ff] mb-4">Send Bulk Email</h2>
             <p className="text-[#a0a0c0] mb-4">Send an email to all applicants for this job</p>
             
@@ -1428,8 +1487,8 @@ export default function Jobs() {
 
       {/* Edit Job Modal */}
       {editingJobId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-3xl w-full my-8">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto">
+          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-3xl w-full m-4 my-8">
             <h2 className="text-2xl font-bold text-[#e0e0ff] mb-6">Edit Job</h2>
             
             {jobFormError && (
@@ -1471,6 +1530,18 @@ export default function Jobs() {
                     <option value="part-time">Part-time</option>
                     <option value="contract">Contract</option>
                     <option value="internship">Internship</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[#a0a0c0] mb-2 font-medium">Job Status *</label>
+                  <select
+                    value={editJobForm.status}
+                    onChange={(e) => setEditJobForm({ ...editJobForm, status: e.target.value })}
+                    className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                  >
+                    <option value="open">Open</option>
+                    <option value="closed">Closed</option>
+                    <option value="paused">Paused</option>
                   </select>
                 </div>
                 <div>
@@ -1571,8 +1642,8 @@ export default function Jobs() {
 
       {/* Applicant Profile Modal */}
       {profileModal.show && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-3xl w-full my-8">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto">
+          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-3xl w-full m-4 my-8">
             <div className="flex justify-between items-start mb-6">
               <div className="flex-1">
                 <h2 className="text-2xl font-bold text-[#e0e0ff]">Applicant Profile</h2>
