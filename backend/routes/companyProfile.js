@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { CompanyProfile } = require("../models");
+const { CompanyProfile, ActivityLog } = require("../models");
 const { auth, authorize } = require("../middleware");
 
 /**
@@ -139,6 +139,19 @@ router.put("/", auth, authorize("company"), async (req, res) => {
       { $set: filteredUpdates },
       { new: true, upsert: true }
     );
+
+    // Log activity for profile update
+    try {
+      await ActivityLog.create({
+        user: req.user._id,
+        type: "profile_updated",
+        description: "Updated company profile",
+        metadata: { updatedFields: Object.keys(filteredUpdates) },
+      });
+    } catch (activityError) {
+      console.error("Error logging profile update activity:", activityError);
+      // Don't fail the request if activity logging fails
+    }
 
     res.json(profile);
   } catch (error) {

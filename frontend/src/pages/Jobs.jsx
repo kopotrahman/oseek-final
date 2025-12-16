@@ -448,6 +448,7 @@ export default function Jobs() {
       description: job.description || "",
       location: job.location || "",
       type: job.type || "full-time",
+      status: job.status || "open",
       salaryMin: job.salary?.min || "",
       salaryMax: job.salary?.max || "",
       salaryCurrency: job.salary?.currency || "USD",
@@ -481,6 +482,7 @@ export default function Jobs() {
       description: editJobForm.description.trim(),
       location: editJobForm.location.trim(),
       type: editJobForm.type,
+      status: editJobForm.status,
       experience: editJobForm.experience || undefined,
       salary,
       skills: editJobForm.skills
@@ -521,6 +523,44 @@ export default function Jobs() {
     setEditingJobId(null)
     setEditJobForm({})
     setJobFormError("")
+  }
+
+  const handleDeleteJob = async (jobId, jobTitle) => {
+    if (!window.confirm(`Are you sure you want to delete "${jobTitle}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(API_ENDPOINTS.jobs.delete(jobId), {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setJobFormSuccess("Job deleted successfully!")
+        fetchMyJobs()
+        // Clear success message after 3 seconds
+        if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
+        successTimeoutRef.current = setTimeout(() => {
+          setJobFormSuccess("")
+        }, 3000)
+      } else {
+        setJobFormError(data.message || "Failed to delete job")
+        // Clear error message after 5 seconds
+        if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current)
+        errorTimeoutRef.current = setTimeout(() => {
+          setJobFormError("")
+        }, 5000)
+      }
+    } catch (err) {
+      console.error("Delete job error:", err)
+      setJobFormError("Network error. Please try again later.")
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current)
+      errorTimeoutRef.current = setTimeout(() => {
+        setJobFormError("")
+      }, 5000)
+    }
   }
 
   const viewApplicantProfile = async (profileId) => {
@@ -932,6 +972,12 @@ export default function Jobs() {
                             className="px-3 py-1 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition"
                           >
                             {expandedJobId === job._id ? "Hide applicants" : "View applicants"}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteJob(job._id, job.title)}
+                            className="px-3 py-1 border border-red-500/50 text-red-400 rounded-lg font-semibold hover:bg-red-500/20 transition"
+                          >
+                            Delete Job
                           </button>
                           {job.applicationsCount > 0 && (
                             <button
@@ -1482,6 +1528,18 @@ export default function Jobs() {
                     <option value="part-time">Part-time</option>
                     <option value="contract">Contract</option>
                     <option value="internship">Internship</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[#a0a0c0] mb-2 font-medium">Job Status *</label>
+                  <select
+                    value={editJobForm.status}
+                    onChange={(e) => setEditJobForm({ ...editJobForm, status: e.target.value })}
+                    className="w-full bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg px-4 py-2 text-[#e0e0ff] focus:border-[#0066ff] focus:outline-none"
+                  >
+                    <option value="open">Open</option>
+                    <option value="closed">Closed</option>
+                    <option value="paused">Paused</option>
                   </select>
                 </div>
                 <div>
