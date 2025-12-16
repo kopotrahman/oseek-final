@@ -1,13 +1,24 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { Job, JobSeekerProfile, Application, Wishlist } = require("../models");
 
+// Configuration constants
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+const MIN_MATCH_SCORE = 0.3;
+const MAX_JOBS_PER_REQUEST = 50; // Limit to avoid token limits
+
+/**
+ * Check if Gemini API is available
+ */
+const isGeminiAvailable = () => {
+  return process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "";
+};
+
 // Initialize Gemini AI
 const initializeGemini = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  if (!isGeminiAvailable()) {
     throw new Error("GEMINI_API_KEY is not configured");
   }
-  return new GoogleGenerativeAI(apiKey);
+  return new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 };
 
 /**
@@ -82,13 +93,19 @@ const getGeminiRecommendations = async (userId, limit = 10) => {
       return [];
     }
 
+    // Limit jobs to avoid token limits
+    const jobsToProcess = jobs.slice(0, MAX_JOBS_PER_REQUEST);
+    if (jobs.length > MAX_JOBS_PER_REQUEST) {
+      console.log(`Processing ${MAX_JOBS_PER_REQUEST} out of ${jobs.length} available jobs to stay within API limits`);
+    }
+
     // Format data for Gemini
     const userProfile = formatUserProfile(profile);
-    const formattedJobs = formatJobs(jobs);
+    const formattedJobs = formatJobs(jobsToProcess);
 
     // Initialize Gemini
     const genAI = initializeGemini();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
     // Create the prompt for Gemini
     const prompt = `You are an AI job recommendation assistant. Analyze the following user profile and job listings to recommend the most suitable jobs.
@@ -125,7 +142,7 @@ Rules:
 - Return the top ${limit} most suitable jobs
 - matchScore should be between 0 and 1 (higher is better)
 - Sort by matchScore in descending order
-- Only include jobs with matchScore >= 0.3
+- Only include jobs with matchScore >= ${MIN_MATCH_SCORE}
 - Return an empty array [] if no suitable jobs found
 - Return ONLY the JSON array, no other text`;
 
@@ -141,8 +158,9 @@ Rules:
       const cleanedText = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       recommendations = JSON.parse(cleanedText);
     } catch (parseError) {
-      console.error("Failed to parse Gemini response:", text);
-      console.error("Parse error:", parseError);
+      console.error("Failed to parse Gemini response");
+      console.error("Parse error:", parseError.message);
+      console.error("Response excerpt (first 200 chars):", text.substring(0, 200));
       // Fallback to empty array if parsing fails
       recommendations = [];
     }
@@ -155,7 +173,7 @@ Rules:
 
     // Match recommendations with full job data
     const recommendedJobs = recommendations
-      .filter(rec => rec.jobId && rec.matchScore >= 0.3)
+      .filter(rec => rec.jobId && rec.matchScore >= MIN_MATCH_SCORE)
       .map(rec => {
         const job = jobs.find(j => j._id.toString() === rec.jobId);
         if (!job) return null;
@@ -181,4 +199,5 @@ Rules:
 
 module.exports = {
   getGeminiRecommendations,
+  isGeminiAvailable,
 };
