@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import Header from "../../components/Header"
 import { API_ENDPOINTS, getAuthHeaders } from "../../config/api"
-import { Edit2 } from "lucide-react"
+import { Edit2, MapPin, Globe, Building2, Users, Calendar } from "lucide-react"
 
 export default function CompanyProfile() {
   const navigate = useNavigate()
@@ -11,6 +11,7 @@ export default function CompanyProfile() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [isEditMode, setIsEditMode] = useState(false)
   
   // Settings states
   const [showPasswordForm, setShowPasswordForm] = useState(false)
@@ -75,6 +76,7 @@ export default function CompanyProfile() {
       if (response.ok) {
         setProfile(data)
         setSuccess("Profile updated successfully!")
+        setIsEditMode(false)
         if (timeoutRef.current) clearTimeout(timeoutRef.current)
         timeoutRef.current = setTimeout(() => setSuccess(""), 3000)
       } else {
@@ -237,7 +239,18 @@ export default function CompanyProfile() {
         )}
 
         <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 neon-glow">
-          <h1 className="text-4xl font-bold text-[#e0e0ff] mb-8">Company Profile</h1>
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-4xl font-bold text-[#e0e0ff]">Company Profile</h1>
+            {!isEditMode && (
+              <button
+                onClick={() => setIsEditMode(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition"
+              >
+                <Edit2 size={18} />
+                Edit Profile
+              </button>
+            )}
+          </div>
 
           {/* Profile Picture */}
           <div className="mb-8 flex flex-col items-center">
@@ -253,20 +266,103 @@ export default function CompanyProfile() {
                   <span className="text-4xl text-[#a0a0c0]">🏢</span>
                 )}
               </div>
-              <label className="absolute bottom-0 right-0 bg-[#0066ff] hover:bg-[#0052cc] rounded-full p-2 cursor-pointer transition">
-                <Edit2 size={16} className="text-white" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleProfilePictureChange}
-                  className="hidden"
-                />
-              </label>
+              {isEditMode && (
+                <label className="absolute bottom-0 right-0 bg-[#0066ff] hover:bg-[#0052cc] rounded-full p-2 cursor-pointer transition">
+                  <Edit2 size={16} className="text-white" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePictureChange}
+                    className="hidden"
+                  />
+                </label>
+              )}
             </div>
-            <p className="text-xs text-[#a0a0c0] mt-2">Click to upload company logo (max 1MB)</p>
+            {isEditMode && (
+              <p className="text-xs text-[#a0a0c0] mt-2">Click to upload company logo (max 1MB)</p>
+            )}
           </div>
 
-          <div className="bg-[#0f0f1e] rounded-lg p-6 space-y-6">
+          {!isEditMode ? (
+            /* Profile Display View */
+            <div className="bg-[#0f0f1e] rounded-lg p-6 space-y-6">
+              {/* Company Name */}
+              <div className="text-center mb-6">
+                <h2 className="text-3xl font-bold text-[#e0e0ff]">{profile?.companyName || "Company Name Not Set"}</h2>
+                <p className="text-[#a0a0c0] mt-2">{profile?.email || ""}</p>
+              </div>
+
+              {/* Description */}
+              {profile?.description && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-[#e0e0ff] mb-2">About</h3>
+                  <p className="text-[#cbd5f5]">{profile.description}</p>
+                </div>
+              )}
+
+              {/* Company Details */}
+              <div className="grid md:grid-cols-2 gap-6">
+                {profile?.location && (
+                  <div className="flex items-start gap-3">
+                    <MapPin size={20} className="text-[#0066ff] mt-1" />
+                    <div>
+                      <p className="text-[#a0a0c0] text-sm">Location</p>
+                      <p className="text-[#e0e0ff] font-medium">{profile.location}</p>
+                    </div>
+                  </div>
+                )}
+
+                {profile?.website && (
+                  <div className="flex items-start gap-3">
+                    <Globe size={20} className="text-[#0066ff] mt-1" />
+                    <div>
+                      <p className="text-[#a0a0c0] text-sm">Website</p>
+                      <a 
+                        href={profile.website} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-[#0066ff] hover:underline font-medium"
+                      >
+                        {profile.website}
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {profile?.industry && (
+                  <div className="flex items-start gap-3">
+                    <Building2 size={20} className="text-[#0066ff] mt-1" />
+                    <div>
+                      <p className="text-[#a0a0c0] text-sm">Industry</p>
+                      <p className="text-[#e0e0ff] font-medium">{profile.industry}</p>
+                    </div>
+                  </div>
+                )}
+
+                {profile?.size && (
+                  <div className="flex items-start gap-3">
+                    <Users size={20} className="text-[#0066ff] mt-1" />
+                    <div>
+                      <p className="text-[#a0a0c0] text-sm">Company Size</p>
+                      <p className="text-[#e0e0ff] font-medium">{profile.size}</p>
+                    </div>
+                  </div>
+                )}
+
+                {profile?.founded && (
+                  <div className="flex items-start gap-3">
+                    <Calendar size={20} className="text-[#0066ff] mt-1" />
+                    <div>
+                      <p className="text-[#a0a0c0] text-sm">Founded</p>
+                      <p className="text-[#e0e0ff] font-medium">{profile.founded}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Profile Edit Form */
+            <div className="bg-[#0f0f1e] rounded-lg p-6 space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-[#a0a0c0] mb-2 font-medium">Company Name</label>
@@ -355,15 +451,32 @@ export default function CompanyProfile() {
               </div>
             </div>
 
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full bg-[#0066ff] text-white rounded-lg py-2 font-semibold hover:bg-[#0052cc] transition disabled:opacity-50"
-            >
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
+            <div className="flex gap-4">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 bg-[#0066ff] text-white rounded-lg py-2 font-semibold hover:bg-[#0052cc] transition disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
+              <button
+                onClick={() => {
+                  setIsEditMode(false)
+                  fetchProfile() // Reset to original profile data
+                }}
+                disabled={saving}
+                className="flex-1 bg-transparent border border-[#2d2d4d] text-[#e0e0ff] rounded-lg py-2 font-semibold hover:border-[#0066ff] transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
 
-            {/* Account Settings */}
+            </div>
+          )}
+
+          {/* Account Settings - Always visible */}
+          {isEditMode && (
+            <div className="bg-[#0f0f1e] rounded-lg p-6 mt-6">
             <div className="mt-8 pt-8 border-t border-[#2d2d4d]">
               <h2 className="text-2xl font-bold text-[#e0e0ff] mb-6">Account Settings</h2>
               
@@ -457,7 +570,8 @@ export default function CompanyProfile() {
                 )}
               </div>
             </div>
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
