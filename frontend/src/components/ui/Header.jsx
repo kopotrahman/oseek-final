@@ -1,4 +1,4 @@
-import { LogOut, Briefcase, Heart, Clock, Bell,LayoutDashboard } from "lucide-react";
+import { LogOut, Briefcase, Heart, Clock, Bell, LayoutDashboard, User } from "lucide-react";
 import { useSyncExternalStore, useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_ENDPOINTS, getAuthHeaders } from "../../config/api";
@@ -129,6 +129,15 @@ export default function Header() {
                       {unreadCount > 9 ? "9+" : unreadCount}
                     </span>
                   )}
+                </button>
+              )}
+              {!isAdmin && (
+                <button
+                  onClick={() => navigate(isSeeker ? "/profile/seeker" : "/profile/company")}
+                  className="flex items-center gap-2 text-text-secondary hover:text-text transition"
+                >
+                  <User className="w-4 h-4" />
+                  Profile
                 </button>
               )}
               <button className="flex items-center gap-2 text-text-secondary hover:text-text transition"
