@@ -944,15 +944,18 @@ export default function JobSeekerProfile() {
               </div>
             ) : connections.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {connections.slice(0, 6).map((connection) => {
-                  // Determine if the current user is the requester or recipient
+                {(() => {
+                  // Parse user once outside the map
                   const user = JSON.parse(localStorage.getItem("user") || "{}")
-                  const otherUser = connection.requester._id === user._id 
-                    ? connection.recipient 
-                    : connection.requester
-                  const otherProfile = connection.requester._id === user._id
-                    ? connection.recipientProfile
-                    : connection.requesterProfile
+                  
+                  return connections.slice(0, 6).map((connection) => {
+                    // Determine if the current user is the requester or recipient
+                    const otherUser = connection.requester._id === user._id 
+                      ? connection.recipient 
+                      : connection.requester
+                    const otherProfile = connection.requester._id === user._id
+                      ? connection.recipientProfile
+                      : connection.requesterProfile
                   
                   return (
                     <div
@@ -986,8 +989,9 @@ export default function JobSeekerProfile() {
                         </div>
                       </div>
                     </div>
-                  )
-                })}
+                    )
+                  })
+                })()}
               </div>
             ) : (
               <div className="text-center py-8 bg-[#0f0f1e] rounded-lg border border-[#2d2d4d]">

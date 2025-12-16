@@ -18,7 +18,8 @@ export const ThemeProvider = ({ children }) => {
       return savedTheme
     }
     // Check system preference
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)')
+    if (prefersDark && prefersDark.matches) {
       return 'light'
     }
     return 'dark'
