@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import Header from "../components/Header"
 import { API_ENDPOINTS, getAuthHeaders } from "../config/api"
-import { MapPin, Briefcase, DollarSign, Clock, Heart } from "lucide-react"
+import { MapPin, Briefcase, DollarSign, Clock, Heart, ChevronDown, ChevronUp } from "lucide-react"
 
 export default function Jobs() {
   const [q, setQ] = useState("")
@@ -45,6 +45,7 @@ export default function Jobs() {
   const [updatingJob, setUpdatingJob] = useState(false)
   const [profileModal, setProfileModal] = useState({ show: false, profileId: null, profile: null })
   const [loadingProfile, setLoadingProfile] = useState(false)
+  const [isPostJobExpanded, setIsPostJobExpanded] = useState(false)
   
   // Refs for timeout cleanup
   const successTimeoutRef = useRef(null)
@@ -665,24 +666,36 @@ export default function Jobs() {
         )}
 
         {isCompany && (
-          <div className="mb-10 bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 neon-glow">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-              <h2 className="text-2xl font-bold text-[#e0e0ff]">Post a Job</h2>
+          <div className="mb-10 bg-[#16213e] border border-[#2d2d4d] rounded-2xl neon-glow">
+            <div 
+              className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-8 cursor-pointer hover:bg-[#1a2540] transition-colors"
+              onClick={() => setIsPostJobExpanded(!isPostJobExpanded)}
+            >
+              <div className="flex items-center gap-3 flex-1">
+                <h2 className="text-2xl font-bold text-[#e0e0ff]">Post a Job</h2>
+                {isPostJobExpanded ? (
+                  <ChevronUp className="text-[#a0a0c0]" size={24} />
+                ) : (
+                  <ChevronDown className="text-[#a0a0c0]" size={24} />
+                )}
+              </div>
               <p className="text-[#a0a0c0] text-sm">Share your open roles with seekers instantly.</p>
             </div>
 
-            {jobFormError && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
-                {jobFormError}
-              </div>
-            )}
-            {jobFormSuccess && (
-              <div className="mb-4 p-3 bg-green-500/10 border border-green-500/50 rounded-lg text-green-400 text-sm">
-                {jobFormSuccess}
-              </div>
-            )}
+            {isPostJobExpanded && (
+              <div className="px-8 pb-8">
+                {jobFormError && (
+                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                    {jobFormError}
+                  </div>
+                )}
+                {jobFormSuccess && (
+                  <div className="mb-4 p-3 bg-green-500/10 border border-green-500/50 rounded-lg text-green-400 text-sm">
+                    {jobFormSuccess}
+                  </div>
+                )}
 
-            <form className="space-y-4" onSubmit={handleCreateJob}>
+                <form className="space-y-4" onSubmit={handleCreateJob}>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[#a0a0c0] mb-2 font-medium">Job Title *</label>
@@ -799,6 +812,8 @@ export default function Jobs() {
                 {postingJob ? "Posting..." : "Post Job"}
               </button>
             </form>
+              </div>
+            )}
           </div>
         )}
 
