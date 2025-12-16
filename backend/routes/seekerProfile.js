@@ -5,6 +5,208 @@ const { JobSeekerProfile, Application, Job } = require("../models");
 const { auth, authorize } = require("../middleware");
 
 /**
+ * Helper function to generate CV PDF content
+ * @param {PDFDocument} doc - The PDFKit document object
+ * @param {Object} profile - The job seeker profile data
+ */
+function generateCVContent(doc, profile) {
+  // Define colors matching web design
+  const primaryColor = '#0066ff';
+  const accentColor = '#00d9ff';
+  const textColor = '#333333';
+  const lightTextColor = '#666666';
+  
+  // Add profile picture if available
+  if (profile.profilePicture) {
+    try {
+      // Extract base64 data if it includes data URL prefix
+      let imageData = profile.profilePicture;
+      if (imageData.startsWith('data:')) {
+        imageData = imageData.split(',')[1];
+      }
+      
+      // Convert base64 to buffer
+      const imageBuffer = Buffer.from(imageData, 'base64');
+      
+      // Add profile picture centered at top
+      const imageSize = 80;
+      const pageWidth = doc.page.width;
+      const imageX = (pageWidth - imageSize) / 2;
+      
+      doc.image(imageBuffer, imageX, 50, { 
+        fit: [imageSize, imageSize],
+        align: 'center'
+      });
+      
+      doc.moveDown(6); // Space after image
+    } catch (imgError) {
+      console.error("Error adding profile picture to CV:", imgError);
+      // Continue without image if there's an error
+      doc.moveDown(1);
+    }
+  } else {
+    doc.moveDown(1);
+  }
+
+  // Header with name - styled with color
+  doc.fontSize(28)
+     .fillColor(primaryColor)
+     .font("Helvetica-Bold")
+     .text(profile.fullName || "Job Seeker", { align: "center" });
+  doc.moveDown(0.3);
+
+  // Headline - styled with accent color
+  if (profile.headline) {
+    doc.fontSize(14)
+       .fillColor(accentColor)
+       .font("Helvetica-Bold")
+       .text(profile.headline, { align: "center" });
+    doc.moveDown(0.5);
+  }
+
+  // Contact info - compact and centered
+  doc.fontSize(10)
+     .fillColor(lightTextColor)
+     .font("Helvetica");
+  
+  const contactInfo = [];
+  if (profile.email) contactInfo.push(`📧 ${profile.email}`);
+  if (profile.phone) contactInfo.push(`📱 ${profile.phone}`);
+  if (profile.location) contactInfo.push(`📍 ${profile.location}`);
+  
+  if (contactInfo.length > 0) {
+    doc.text(contactInfo.join("  •  "), { align: "center" });
+    doc.moveDown(1.5);
+  }
+
+  // Add a horizontal line separator
+  doc.strokeColor(primaryColor)
+     .lineWidth(2)
+     .moveTo(50, doc.y)
+     .lineTo(doc.page.width - 50, doc.y)
+     .stroke();
+  doc.moveDown(1);
+
+  // Bio/Summary section
+  if (profile.bio) {
+    doc.fontSize(16)
+       .fillColor(primaryColor)
+       .font("Helvetica-Bold")
+       .text("PROFESSIONAL SUMMARY");
+    doc.moveDown(0.5);
+    
+    doc.fontSize(10)
+       .fillColor(textColor)
+       .font("Helvetica")
+       .text(profile.bio, { align: 'justify' });
+    doc.moveDown(1.5);
+  }
+
+  // Skills section with better formatting
+  if (profile.skills && profile.skills.length > 0) {
+    doc.fontSize(16)
+       .fillColor(primaryColor)
+       .font("Helvetica-Bold")
+       .text("SKILLS");
+    doc.moveDown(0.5);
+    
+    doc.fontSize(10)
+       .fillColor(textColor)
+       .font("Helvetica")
+       .text(profile.skills.join("  •  "), { align: 'left' });
+    doc.moveDown(1.5);
+  }
+
+  // Experience section with enhanced layout
+  if (profile.experience && profile.experience.length > 0) {
+    doc.fontSize(16)
+       .fillColor(primaryColor)
+       .font("Helvetica-Bold")
+       .text("WORK EXPERIENCE");
+    doc.moveDown(0.5);
+
+    profile.experience.forEach((exp, index) => {
+      // Job title in bold
+      doc.fontSize(12)
+         .fillColor(textColor)
+         .font("Helvetica-Bold")
+         .text(exp.title);
+      
+      // Company and duration with accent color
+      doc.fontSize(10)
+         .fillColor(accentColor)
+         .font("Helvetica")
+         .text(`${exp.company}  •  ${exp.duration}`);
+      
+      // Description
+      if (exp.description) {
+        doc.fontSize(10)
+           .fillColor(textColor)
+           .font("Helvetica")
+           .text(exp.description, { 
+             indent: 20,
+             paragraphGap: 5
+           });
+      }
+      
+      if (index < profile.experience.length - 1) {
+        doc.moveDown(0.8);
+      }
+    });
+
+    doc.moveDown(1.5);
+  }
+
+  // Education section with enhanced layout
+  if (profile.education && profile.education.length > 0) {
+    doc.fontSize(16)
+       .fillColor(primaryColor)
+       .font("Helvetica-Bold")
+       .text("EDUCATION");
+    doc.moveDown(0.5);
+
+    profile.education.forEach((edu, index) => {
+      // Degree in bold
+      doc.fontSize(12)
+         .fillColor(textColor)
+         .font("Helvetica-Bold")
+         .text(edu.degree);
+      
+      // School and year with accent color
+      doc.fontSize(10)
+         .fillColor(accentColor)
+         .font("Helvetica")
+         .text(`${edu.school}  •  ${edu.year}`);
+      
+      if (index < profile.education.length - 1) {
+        doc.moveDown(0.8);
+      }
+    });
+
+    doc.moveDown(1.5);
+  }
+
+  // Footer with branding
+  const footerY = doc.page.height - 70;
+  if (doc.y < footerY) {
+    doc.y = footerY;
+  }
+  
+  // Add separator line
+  doc.strokeColor(primaryColor)
+     .lineWidth(1)
+     .moveTo(50, doc.y)
+     .lineTo(doc.page.width - 50, doc.y)
+     .stroke();
+  doc.moveDown(0.5);
+  
+  doc.fontSize(8)
+     .fillColor(lightTextColor)
+     .font("Helvetica")
+     .text("Generated from OSEEK Job Portal", { align: "center" });
+}
+
+/**
  * @swagger
  * components:
  *   schemas:
@@ -595,200 +797,8 @@ router.get("/download-cv", auth, authorize("seeker"), async (req, res) => {
     // Pipe PDF to response
     doc.pipe(res);
 
-    // Define colors matching web design
-    const primaryColor = '#0066ff';
-    const accentColor = '#00d9ff';
-    const textColor = '#333333';
-    const lightTextColor = '#666666';
-    
-    // Add profile picture if available
-    if (profile.profilePicture) {
-      try {
-        // Extract base64 data if it includes data URL prefix
-        let imageData = profile.profilePicture;
-        if (imageData.startsWith('data:')) {
-          imageData = imageData.split(',')[1];
-        }
-        
-        // Convert base64 to buffer
-        const imageBuffer = Buffer.from(imageData, 'base64');
-        
-        // Add profile picture centered at top
-        const imageSize = 80;
-        const pageWidth = doc.page.width;
-        const imageX = (pageWidth - imageSize) / 2;
-        
-        doc.image(imageBuffer, imageX, 50, { 
-          fit: [imageSize, imageSize],
-          align: 'center'
-        });
-        
-        doc.moveDown(6); // Space after image
-      } catch (imgError) {
-        console.error("Error adding profile picture to CV:", imgError);
-        // Continue without image if there's an error
-        doc.moveDown(1);
-      }
-    } else {
-      doc.moveDown(1);
-    }
-
-    // Header with name - styled with color
-    doc.fontSize(28)
-       .fillColor(primaryColor)
-       .font("Helvetica-Bold")
-       .text(profile.fullName || "Job Seeker", { align: "center" });
-    doc.moveDown(0.3);
-
-    // Headline - styled with accent color
-    if (profile.headline) {
-      doc.fontSize(14)
-         .fillColor(accentColor)
-         .font("Helvetica-Bold")
-         .text(profile.headline, { align: "center" });
-      doc.moveDown(0.5);
-    }
-
-    // Contact info - compact and centered
-    doc.fontSize(10)
-       .fillColor(lightTextColor)
-       .font("Helvetica");
-    
-    const contactInfo = [];
-    if (profile.email) contactInfo.push(`📧 ${profile.email}`);
-    if (profile.phone) contactInfo.push(`📱 ${profile.phone}`);
-    if (profile.location) contactInfo.push(`📍 ${profile.location}`);
-    
-    if (contactInfo.length > 0) {
-      doc.text(contactInfo.join("  •  "), { align: "center" });
-      doc.moveDown(1.5);
-    }
-
-    // Add a horizontal line separator
-    doc.strokeColor(primaryColor)
-       .lineWidth(2)
-       .moveTo(50, doc.y)
-       .lineTo(doc.page.width - 50, doc.y)
-       .stroke();
-    doc.moveDown(1);
-
-    // Bio/Summary section
-    if (profile.bio) {
-      doc.fontSize(16)
-         .fillColor(primaryColor)
-         .font("Helvetica-Bold")
-         .text("PROFESSIONAL SUMMARY");
-      doc.moveDown(0.5);
-      
-      doc.fontSize(10)
-         .fillColor(textColor)
-         .font("Helvetica")
-         .text(profile.bio, { align: 'justify' });
-      doc.moveDown(1.5);
-    }
-
-    // Skills section with better formatting
-    if (profile.skills && profile.skills.length > 0) {
-      doc.fontSize(16)
-         .fillColor(primaryColor)
-         .font("Helvetica-Bold")
-         .text("SKILLS");
-      doc.moveDown(0.5);
-      
-      doc.fontSize(10)
-         .fillColor(textColor)
-         .font("Helvetica")
-         .text(profile.skills.join("  •  "), { align: 'left' });
-      doc.moveDown(1.5);
-    }
-
-    // Experience section with enhanced layout
-    if (profile.experience && profile.experience.length > 0) {
-      doc.fontSize(16)
-         .fillColor(primaryColor)
-         .font("Helvetica-Bold")
-         .text("WORK EXPERIENCE");
-      doc.moveDown(0.5);
-
-      profile.experience.forEach((exp, index) => {
-        // Job title in bold
-        doc.fontSize(12)
-           .fillColor(textColor)
-           .font("Helvetica-Bold")
-           .text(exp.title);
-        
-        // Company and duration with accent color
-        doc.fontSize(10)
-           .fillColor(accentColor)
-           .font("Helvetica")
-           .text(`${exp.company}  •  ${exp.duration}`);
-        
-        // Description
-        if (exp.description) {
-          doc.fontSize(10)
-             .fillColor(textColor)
-             .font("Helvetica")
-             .text(exp.description, { 
-               indent: 20,
-               paragraphGap: 5
-             });
-        }
-        
-        if (index < profile.experience.length - 1) {
-          doc.moveDown(0.8);
-        }
-      });
-
-      doc.moveDown(1.5);
-    }
-
-    // Education section with enhanced layout
-    if (profile.education && profile.education.length > 0) {
-      doc.fontSize(16)
-         .fillColor(primaryColor)
-         .font("Helvetica-Bold")
-         .text("EDUCATION");
-      doc.moveDown(0.5);
-
-      profile.education.forEach((edu, index) => {
-        // Degree in bold
-        doc.fontSize(12)
-           .fillColor(textColor)
-           .font("Helvetica-Bold")
-           .text(edu.degree);
-        
-        // School and year with accent color
-        doc.fontSize(10)
-           .fillColor(accentColor)
-           .font("Helvetica")
-           .text(`${edu.school}  •  ${edu.year}`);
-        
-        if (index < profile.education.length - 1) {
-          doc.moveDown(0.8);
-        }
-      });
-
-      doc.moveDown(1.5);
-    }
-
-    // Footer with branding
-    const footerY = doc.page.height - 70;
-    if (doc.y < footerY) {
-      doc.y = footerY;
-    }
-    
-    // Add separator line
-    doc.strokeColor(primaryColor)
-       .lineWidth(1)
-       .moveTo(50, doc.y)
-       .lineTo(doc.page.width - 50, doc.y)
-       .stroke();
-    doc.moveDown(0.5);
-    
-    doc.fontSize(8)
-       .fillColor(lightTextColor)
-       .font("Helvetica")
-       .text("Generated from OSEEK Job Portal", { align: "center" });
+    // Generate CV content using helper function
+    generateCVContent(doc, profile);
 
     // Finalize PDF
     doc.end();
@@ -869,200 +879,8 @@ router.get("/:userId/download-cv", auth, authorize("company"), async (req, res) 
     // Pipe PDF to response
     doc.pipe(res);
 
-    // Define colors matching web design
-    const primaryColor = '#0066ff';
-    const accentColor = '#00d9ff';
-    const textColor = '#333333';
-    const lightTextColor = '#666666';
-    
-    // Add profile picture if available
-    if (profile.profilePicture) {
-      try {
-        // Extract base64 data if it includes data URL prefix
-        let imageData = profile.profilePicture;
-        if (imageData.startsWith('data:')) {
-          imageData = imageData.split(',')[1];
-        }
-        
-        // Convert base64 to buffer
-        const imageBuffer = Buffer.from(imageData, 'base64');
-        
-        // Add profile picture centered at top
-        const imageSize = 80;
-        const pageWidth = doc.page.width;
-        const imageX = (pageWidth - imageSize) / 2;
-        
-        doc.image(imageBuffer, imageX, 50, { 
-          fit: [imageSize, imageSize],
-          align: 'center'
-        });
-        
-        doc.moveDown(6); // Space after image
-      } catch (imgError) {
-        console.error("Error adding profile picture to CV:", imgError);
-        // Continue without image if there's an error
-        doc.moveDown(1);
-      }
-    } else {
-      doc.moveDown(1);
-    }
-
-    // Header with name - styled with color
-    doc.fontSize(28)
-       .fillColor(primaryColor)
-       .font("Helvetica-Bold")
-       .text(profile.fullName || "Job Seeker", { align: "center" });
-    doc.moveDown(0.3);
-
-    // Headline - styled with accent color
-    if (profile.headline) {
-      doc.fontSize(14)
-         .fillColor(accentColor)
-         .font("Helvetica-Bold")
-         .text(profile.headline, { align: "center" });
-      doc.moveDown(0.5);
-    }
-
-    // Contact info - compact and centered
-    doc.fontSize(10)
-       .fillColor(lightTextColor)
-       .font("Helvetica");
-    
-    const contactInfo = [];
-    if (profile.email) contactInfo.push(`📧 ${profile.email}`);
-    if (profile.phone) contactInfo.push(`📱 ${profile.phone}`);
-    if (profile.location) contactInfo.push(`📍 ${profile.location}`);
-    
-    if (contactInfo.length > 0) {
-      doc.text(contactInfo.join("  •  "), { align: "center" });
-      doc.moveDown(1.5);
-    }
-
-    // Add a horizontal line separator
-    doc.strokeColor(primaryColor)
-       .lineWidth(2)
-       .moveTo(50, doc.y)
-       .lineTo(doc.page.width - 50, doc.y)
-       .stroke();
-    doc.moveDown(1);
-
-    // Bio/Summary section
-    if (profile.bio) {
-      doc.fontSize(16)
-         .fillColor(primaryColor)
-         .font("Helvetica-Bold")
-         .text("PROFESSIONAL SUMMARY");
-      doc.moveDown(0.5);
-      
-      doc.fontSize(10)
-         .fillColor(textColor)
-         .font("Helvetica")
-         .text(profile.bio, { align: 'justify' });
-      doc.moveDown(1.5);
-    }
-
-    // Skills section with better formatting
-    if (profile.skills && profile.skills.length > 0) {
-      doc.fontSize(16)
-         .fillColor(primaryColor)
-         .font("Helvetica-Bold")
-         .text("SKILLS");
-      doc.moveDown(0.5);
-      
-      doc.fontSize(10)
-         .fillColor(textColor)
-         .font("Helvetica")
-         .text(profile.skills.join("  •  "), { align: 'left' });
-      doc.moveDown(1.5);
-    }
-
-    // Experience section with enhanced layout
-    if (profile.experience && profile.experience.length > 0) {
-      doc.fontSize(16)
-         .fillColor(primaryColor)
-         .font("Helvetica-Bold")
-         .text("WORK EXPERIENCE");
-      doc.moveDown(0.5);
-
-      profile.experience.forEach((exp, index) => {
-        // Job title in bold
-        doc.fontSize(12)
-           .fillColor(textColor)
-           .font("Helvetica-Bold")
-           .text(exp.title);
-        
-        // Company and duration with accent color
-        doc.fontSize(10)
-           .fillColor(accentColor)
-           .font("Helvetica")
-           .text(`${exp.company}  •  ${exp.duration}`);
-        
-        // Description
-        if (exp.description) {
-          doc.fontSize(10)
-             .fillColor(textColor)
-             .font("Helvetica")
-             .text(exp.description, { 
-               indent: 20,
-               paragraphGap: 5
-             });
-        }
-        
-        if (index < profile.experience.length - 1) {
-          doc.moveDown(0.8);
-        }
-      });
-
-      doc.moveDown(1.5);
-    }
-
-    // Education section with enhanced layout
-    if (profile.education && profile.education.length > 0) {
-      doc.fontSize(16)
-         .fillColor(primaryColor)
-         .font("Helvetica-Bold")
-         .text("EDUCATION");
-      doc.moveDown(0.5);
-
-      profile.education.forEach((edu, index) => {
-        // Degree in bold
-        doc.fontSize(12)
-           .fillColor(textColor)
-           .font("Helvetica-Bold")
-           .text(edu.degree);
-        
-        // School and year with accent color
-        doc.fontSize(10)
-           .fillColor(accentColor)
-           .font("Helvetica")
-           .text(`${edu.school}  •  ${edu.year}`);
-        
-        if (index < profile.education.length - 1) {
-          doc.moveDown(0.8);
-        }
-      });
-
-      doc.moveDown(1.5);
-    }
-
-    // Footer with branding
-    const footerY = doc.page.height - 70;
-    if (doc.y < footerY) {
-      doc.y = footerY;
-    }
-    
-    // Add separator line
-    doc.strokeColor(primaryColor)
-       .lineWidth(1)
-       .moveTo(50, doc.y)
-       .lineTo(doc.page.width - 50, doc.y)
-       .stroke();
-    doc.moveDown(0.5);
-    
-    doc.fontSize(8)
-       .fillColor(lightTextColor)
-       .font("Helvetica")
-       .text("Generated from OSEEK Job Portal", { align: "center" });
+    // Generate CV content using helper function
+    generateCVContent(doc, profile);
 
     // Finalize PDF
     doc.end();

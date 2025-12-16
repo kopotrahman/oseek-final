@@ -929,10 +929,11 @@ export default function Jobs() {
                                       )}
                                       {application.applicant?._id && (
                                         <button
-                                          onClick={() => downloadApplicantCV(
-                                            application.applicant._id,
-                                            application.applicant?.name || application.applicantProfile?.fullName
-                                          )}
+                                          onClick={() => {
+                                            // Use applicant.name from User model, fallback to applicantProfile.fullName from JobSeekerProfile
+                                            const applicantName = application.applicant?.name || application.applicantProfile?.fullName || 'Applicant'
+                                            downloadApplicantCV(application.applicant._id, applicantName)
+                                          }}
                                           className="px-4 py-2 bg-purple-500/20 text-purple-400 border border-purple-500/50 rounded-lg font-semibold hover:bg-purple-500/30 transition text-sm"
                                         >
                                           Download CV
