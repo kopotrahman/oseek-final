@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
 const he = require("he");
-const { Application, Job, JobSeekerProfile, ActivityLog, User, CompanyProfile } = require("../models");
+const { Application, Job, JobSeekerProfile, ActivityLog, User, CompanyProfile, Notification } = require("../models");
 const { auth, authorize } = require("../middleware");
 const { sendInterviewInvitation, sendEmail } = require("../utils/emailService");
 
@@ -123,6 +123,28 @@ router.post("/", auth, authorize("seeker"), async (req, res) => {
       relatedJob: jobId,
       relatedApplication: application._id,
     });
+
+    // Create notification for company
+    try {
+      const applicantProfile = await JobSeekerProfile.findOne({ user: req.user._id });
+      const applicantName = applicantProfile?.fullName || req.user.name || "A candidate";
+      
+      await Notification.create({
+        user: job.company,
+        type: "new_application",
+        title: "New Job Application",
+        message: `${applicantName} has applied for your job posting: ${job.title}`,
+        relatedJob: jobId,
+        metadata: {
+          applicationId: application._id,
+          applicantId: req.user._id,
+          applicantName: applicantName,
+        },
+      });
+    } catch (notificationError) {
+      console.error("Error creating notification:", notificationError);
+      // Don't fail the request if notification fails
+    }
 
     res.status(201).json(application);
   } catch (error) {
@@ -320,6 +342,40 @@ router.put("/:id/status", auth, authorize("company"), async (req, res) => {
       relatedJob: application.job._id,
       relatedApplication: application._id,
     });
+
+    // Create notification for applicant
+    try {
+      const companyProfile = await CompanyProfile.findOne({ user: req.user._id });
+      const companyName = companyProfile?.companyName || "A company";
+      
+      // Create more user-friendly status messages
+      const statusMessages = {
+        pending: "Your application is now pending review",
+        reviewing: "Your application is being reviewed",
+        shortlisted: "Congratulations! You've been shortlisted",
+        interview: "You've been invited for an interview",
+        rejected: "Your application status has been updated",
+        hired: "Congratulations! You've been hired",
+        accepted: "Your acceptance has been confirmed"
+      };
+
+      await Notification.create({
+        user: application.applicant,
+        type: "application_status_update",
+        title: "Application Status Updated",
+        message: `${companyName} has updated your application for "${application.job.title}": ${statusMessages[status] || `Status changed to ${status}`}`,
+        relatedJob: application.job._id,
+        metadata: {
+          applicationId: application._id,
+          jobTitle: application.job.title,
+          newStatus: status,
+          companyName: companyName,
+        },
+      });
+    } catch (notificationError) {
+      console.error("Error creating notification:", notificationError);
+      // Don't fail the request if notification fails
+    }
 
     res.json(application);
   } catch (error) {
