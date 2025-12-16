@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useNavigate } from "react-router-dom"
 import Header from "../components/Header"
 import { API_ENDPOINTS, getAuthHeaders } from "../config/api"
 import { MapPin, Briefcase, DollarSign, Clock, Heart, ChevronDown, ChevronUp, Sparkles } from "lucide-react"
 
 export default function Jobs() {
+  const navigate = useNavigate()
   const [q, setQ] = useState("")
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1070,7 +1072,18 @@ export default function Jobs() {
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
                           <h3 className="text-lg font-bold text-[#e0e0ff] mb-1">{job.title}</h3>
-                          <p className="text-[#00d9ff] font-medium mb-2">{job.companyName}</p>
+                          {job.company && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                navigate(`/company/${job.company}`)
+                              }}
+                              className="text-[#00d9ff] font-medium mb-2 hover:underline cursor-pointer text-left"
+                            >
+                              {job.companyName}
+                            </button>
+                          )}
+                          {!job.company && <p className="text-[#00d9ff] font-medium mb-2">{job.companyName}</p>}
                           <div className="flex flex-wrap gap-4 text-[#a0a0c0] text-sm">
                             <span className="flex items-center gap-1">
                               <MapPin size={14} />
@@ -1190,7 +1203,15 @@ export default function Jobs() {
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <h2 className="text-xl font-semibold text-[#e0e0ff]">{job.title}</h2>
-                      <p className="text-[#00d9ff] font-medium">{job.companyName}</p>
+                      {job.company && (
+                        <button
+                          onClick={() => navigate(`/company/${job.company}`)}
+                          className="text-[#00d9ff] font-medium hover:underline cursor-pointer text-left"
+                        >
+                          {job.companyName}
+                        </button>
+                      )}
+                      {!job.company && <p className="text-[#00d9ff] font-medium">{job.companyName}</p>}
                       <div className="flex flex-wrap gap-4 mt-2 text-[#a0a0c0] text-sm">
                         <span className="flex items-center gap-1">
                           <MapPin size={14} /> {job.location}

@@ -4,6 +4,7 @@ import Login from "./pages/Login"
 import Signup from "./pages/Signup"
 import JobSeekerProfile from "./pages/profile/JobSeekerProfile"
 import CompanyProfile from "./pages/profile/CompanyProfile"
+import CompanyPublicProfile from "./pages/CompanyPublicProfile"
 import Dashboard from "./pages/Dashboard"
 import AdminDashboard from "./pages/AdminDashboard"
 import Jobs from "./pages/Jobs"
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/connections" element={<Connections />} />
           <Route path="/connections/profile/:userId" element={<ConnectionProfile />} />
+          <Route path="/company/:companyId" element={<CompanyPublicProfile />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/profile-views" element={<ProfileViews />} />
         </Route>
