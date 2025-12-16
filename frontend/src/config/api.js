@@ -78,6 +78,15 @@ export const API_ENDPOINTS = {
     remove: (jobId) => `${API_BASE_URL}/wishlist/${jobId}`,
     check: (jobId) => `${API_BASE_URL}/wishlist/check/${jobId}`,
   },
+  connections: {
+    list: `${API_BASE_URL}/connections`,
+    request: `${API_BASE_URL}/connections/request`,
+    accept: (id) => `${API_BASE_URL}/connections/${id}/accept`,
+    reject: (id) => `${API_BASE_URL}/connections/${id}/reject`,
+    remove: (id) => `${API_BASE_URL}/connections/${id}`,
+    seekers: `${API_BASE_URL}/connections/seekers`,
+    profile: (userId) => `${API_BASE_URL}/connections/profile/${userId}`,
+  },
 }
 
 // Helper function to get auth headers

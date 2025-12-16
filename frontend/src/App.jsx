@@ -10,6 +10,8 @@ import Jobs from "./pages/Jobs"
 import Wishlist from "./pages/Wishlist"
 import ActivityHistory from "./pages/ActivityHistory"
 import Notifications from "./pages/Notifications"
+import Connections from "./pages/Connections"
+import ConnectionProfile from "./pages/ConnectionProfile"
 import ProtectedRoute from "./components/ProtectedRoute"
 
 export default function App() {
@@ -28,6 +30,8 @@ export default function App() {
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/activity" element={<ActivityHistory />} />
           <Route path="/notifications" element={<Notifications />} />
+          <Route path="/connections" element={<Connections />} />
+          <Route path="/connections/profile/:userId" element={<ConnectionProfile />} />
         </Route>
       </Routes>
     </Router>
