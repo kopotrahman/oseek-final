@@ -16,6 +16,7 @@ export const API_ENDPOINTS = {
       update: `${API_BASE_URL}/profile/seeker`,
       downloadCV: `${API_BASE_URL}/profile/seeker/download-cv`,
       downloadApplicantCV: (userId) => `${API_BASE_URL}/profile/seeker/${userId}/download-cv`,
+      downloadProfilePDF: (profileId) => `${API_BASE_URL}/profile/seeker/${profileId}/download-profile-pdf`,
       getPublic: (id) => `${API_BASE_URL}/profile/seeker/${id}`,
       getViews: `${API_BASE_URL}/profile/seeker/views/list`,
       getViewCount: `${API_BASE_URL}/profile/seeker/views/count`,

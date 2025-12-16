@@ -895,6 +895,73 @@ router.get("/:userId/download-cv", auth, authorize("company"), async (req, res) 
 
 /**
  * @swagger
+ * /api/profile/seeker/{id}/download-profile-pdf:
+ *   get:
+ *     summary: Download job seeker profile as PDF (web view format)
+ *     tags: [Job Seeker Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Job seeker profile ID or user ID
+ *     responses:
+ *       200:
+ *         description: Profile PDF file
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       404:
+ *         description: Profile not found
+ */
+router.get("/:id/download-profile-pdf", auth, async (req, res) => {
+  try {
+    const profile = await JobSeekerProfile.findById(req.params.id)
+      .populate('user', 'name');
+    
+    if (!profile) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
+
+    // Create PDF document
+    const doc = new PDFDocument({ 
+      margin: 50,
+      size: 'A4'
+    });
+
+    // Sanitize filename
+    const sanitizedName = (profile.fullName || "Profile")
+      .replace(/[^a-zA-Z0-9_\-\s]/g, "")
+      .substring(0, 50);
+    
+    // Set response headers
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${sanitizedName}_Profile.pdf"`
+    );
+
+    // Pipe PDF to response
+    doc.pipe(res);
+
+    // Generate profile content (similar to CV but formatted as web view)
+    generateCVContent(doc, profile);
+
+    // Finalize PDF
+    doc.end();
+  } catch (error) {
+    console.error("Download profile PDF error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
  * /api/profile/seeker/{id}:
  *   get:
  *     summary: Get public job seeker profile by ID

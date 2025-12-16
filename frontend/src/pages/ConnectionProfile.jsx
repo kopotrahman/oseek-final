@@ -62,6 +62,34 @@ export default function ConnectionProfile() {
     }
   }
 
+  const downloadProfilePDF = async () => {
+    try {
+      const headers = getAuthHeaders()
+      delete headers['Content-Type']
+      
+      const response = await fetch(API_ENDPOINTS.profile.seeker.downloadProfilePDF(profile._id), {
+        headers: headers
+      })
+
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `${profile?.fullName || "Profile"}_Profile.pdf`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        window.URL.revokeObjectURL(url)
+      } else {
+        alert("Failed to download profile PDF")
+      }
+    } catch (err) {
+      console.error("Download profile PDF error:", err)
+      alert("Network error. Please try again later.")
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#0f0f1e] via-[#1a1a2e] to-[#0f0f1e]">
@@ -139,13 +167,22 @@ export default function ConnectionProfile() {
                 )}
               </div>
 
-              <button
-                onClick={downloadCV}
-                className="mt-4 px-6 py-3 bg-[#0066ff] text-white rounded-lg hover:bg-[#0052cc] transition flex items-center gap-2"
-              >
-                <Download size={20} />
-                Download CV
-              </button>
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={downloadProfilePDF}
+                  className="px-6 py-3 bg-green-500/20 text-green-400 border border-green-500/50 rounded-lg hover:bg-green-500/30 transition flex items-center gap-2"
+                >
+                  <Download size={20} />
+                  Download Profile PDF
+                </button>
+                <button
+                  onClick={downloadCV}
+                  className="px-6 py-3 bg-[#0066ff] text-white rounded-lg hover:bg-[#0052cc] transition flex items-center gap-2"
+                >
+                  <Download size={20} />
+                  Download CV
+                </button>
+              </div>
             </div>
           </div>
         </div>

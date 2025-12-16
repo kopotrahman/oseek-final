@@ -554,6 +554,40 @@ export default function Jobs() {
     }
   }
 
+  const downloadProfilePDF = async (profileId, applicantName) => {
+    try {
+      const headers = getAuthHeaders()
+      delete headers['Content-Type'] // Remove Content-Type for blob response
+      
+      const response = await fetch(API_ENDPOINTS.profile.seeker.downloadProfilePDF(profileId), {
+        headers: headers
+      })
+      
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        // Sanitize filename by removing all problematic characters for filenames
+        const sanitizedName = (applicantName || 'Profile')
+          .replace(/[/\\:*?"<>|]/g, '') // Remove invalid filename characters
+          .replace(/\s+/g, '_') // Replace spaces with underscores
+          .substring(0, 50) // Limit length
+        a.download = `${sanitizedName}_Profile.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+      } else {
+        const data = await response.json()
+        setError(data.message || "Failed to download profile PDF")
+      }
+    } catch (err) {
+      console.error("Download profile PDF error:", err)
+      setError("Network error. Please try again later.")
+    }
+  }
+
   const sendInterviewInvitation = async () => {
     if (!interviewMessage.trim()) {
       // Show error in modal context
@@ -1378,6 +1412,17 @@ export default function Jobs() {
                 <h2 className="text-2xl font-bold text-[#e0e0ff]">Applicant Profile</h2>
               </div>
               <div className="flex gap-2 items-center">
+                {profileModal.profile?._id && (
+                  <button
+                    onClick={() => downloadProfilePDF(
+                      profileModal.profile._id,
+                      profileModal.profile.fullName
+                    )}
+                    className="px-4 py-2 bg-green-500/20 text-green-400 border border-green-500/50 rounded-lg font-semibold hover:bg-green-500/30 transition text-sm"
+                  >
+                    Download Profile PDF
+                  </button>
+                )}
                 {profileModal.profile?.user && (
                   <button
                     onClick={() => downloadApplicantCV(
