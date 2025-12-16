@@ -6,6 +6,7 @@ const Application = require("./Application");
 const Wishlist = require("./Wishlist");
 const ActivityLog = require("./ActivityLog");
 const Notification = require("./Notification");
+const Connection = require("./Connection");
 
 module.exports = {
   User,
@@ -16,4 +17,5 @@ module.exports = {
   Wishlist,
   ActivityLog,
   Notification,
+  Connection,
 };

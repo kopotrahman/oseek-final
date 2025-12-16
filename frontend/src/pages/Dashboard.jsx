@@ -219,13 +219,13 @@ export default function Dashboard() {
           <div className="text-center py-8">
             <Sparkles size={48} className="text-[#2d2d4d] mx-auto mb-3" />
             <p className="text-[#a0a0c0] mb-4">
-              Complete your profile to get personalized job recommendations powered by AI
+              No job recommendations available at the moment. Try updating your profile with more skills and experience.
             </p>
             <button
               onClick={() => navigate('/profile/seeker')}
               className="px-6 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition"
             >
-              Complete Profile
+              Update Profile
             </button>
           </div>
         )}

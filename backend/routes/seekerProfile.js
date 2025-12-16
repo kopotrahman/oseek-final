@@ -858,6 +858,9 @@ router.get("/:userId/download-cv", auth, authorize("company"), async (req, res) 
       return res.status(404).json({ message: "Profile not found" });
     }
 
+    // Increment profile views when CV is downloaded
+    await JobSeekerProfile.findByIdAndUpdate(profile._id, { $inc: { profileViews: 1 } });
+
     // Create PDF document with custom page size and margins
     const doc = new PDFDocument({ 
       margin: 50,

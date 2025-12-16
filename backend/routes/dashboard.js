@@ -64,6 +64,7 @@ const { auth } = require("../middleware");
 router.get("/stats", auth, async (req, res) => {
   try {
     if (req.user.role === "seeker") {
+      const { Connection } = require("../models");
       const profile = await JobSeekerProfile.findOne({ user: req.user._id });
       const applications = await Application.find({ applicant: req.user._id })
         .populate("job", "title")
@@ -71,6 +72,12 @@ router.get("/stats", auth, async (req, res) => {
         .limit(5);
 
       const applicationCount = await Application.countDocuments({ applicant: req.user._id });
+
+      // Count accepted connections
+      const connectionCount = await Connection.countDocuments({
+        $or: [{ requester: req.user._id }, { recipient: req.user._id }],
+        status: "accepted",
+      });
 
       const recentActivity = applications.map((app) => ({
         type: "application",
@@ -81,7 +88,7 @@ router.get("/stats", auth, async (req, res) => {
 
       res.json({
         profileViews: profile?.profileViews || 0,
-        connections: 0, 
+        connections: connectionCount, 
         applications: applicationCount,
         recentActivity,
       });
