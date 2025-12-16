@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import Header from "../components/Header"
 import { API_ENDPOINTS, getAuthHeaders } from "../config/api"
-import { MapPin, Briefcase, DollarSign, Clock, Heart, ChevronDown, ChevronUp, Sparkles } from "lucide-react"
+import { MapPin, Briefcase, DollarSign, Clock, Heart, ChevronDown, ChevronUp, Sparkles, RefreshCw } from "lucide-react"
 
 export default function Jobs() {
   const navigate = useNavigate()
@@ -1051,9 +1051,20 @@ export default function Jobs() {
         {/* AI-Powered Job Recommendations for Seekers */}
         {isSeeker && (
           <div className="mb-10 bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 neon-glow">
-            <div className="flex items-center gap-3 mb-6">
-              <Sparkles size={28} className="text-[#00d9ff]" />
-              <h2 className="text-2xl font-bold text-[#e0e0ff]">AI-Powered Recommendations</h2>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <Sparkles size={28} className="text-[#00d9ff]" />
+                <h2 className="text-2xl font-bold text-[#e0e0ff]">AI-Powered Recommendations</h2>
+              </div>
+              <button
+                onClick={fetchRecommendations}
+                disabled={loadingRecommendations}
+                className="flex items-center gap-2 px-4 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Refresh recommendations"
+              >
+                <RefreshCw size={18} className={loadingRecommendations ? "animate-spin" : ""} />
+                Refresh
+              </button>
             </div>
 
             {loadingRecommendations ? (
