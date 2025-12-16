@@ -174,14 +174,20 @@ router.get("/", async (req, res) => {
       query.location = { $regex: escapedLocation, $options: "i" };
     }
 
-    // Filter by salary range
+    // Filter by salary range - validate inputs to prevent injection
     if (salaryMin || salaryMax) {
       query["salary.max"] = query["salary.max"] || {};
       if (salaryMin) {
-        query["salary.max"].$gte = parseInt(salaryMin);
+        const parsedMin = parseInt(salaryMin, 10);
+        if (!isNaN(parsedMin) && parsedMin >= 0) {
+          query["salary.max"].$gte = parsedMin;
+        }
       }
       if (salaryMax) {
-        query["salary.max"].$lte = parseInt(salaryMax);
+        const parsedMax = parseInt(salaryMax, 10);
+        if (!isNaN(parsedMax) && parsedMax >= 0) {
+          query["salary.max"].$lte = parsedMax;
+        }
       }
     }
 
