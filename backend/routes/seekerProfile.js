@@ -934,9 +934,10 @@ router.get("/:id/download-profile-pdf", auth, async (req, res) => {
       size: 'A4'
     });
 
-    // Sanitize filename
+    // Sanitize filename - consistent with frontend
     const sanitizedName = (profile.fullName || "Profile")
-      .replace(/[^a-zA-Z0-9_\-\s]/g, "")
+      .replace(/[/\\:*?"<>|]/g, "")
+      .replace(/\s+/g, "_")
       .substring(0, 50);
     
     // Set response headers

@@ -76,7 +76,12 @@ export default function ConnectionProfile() {
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement("a")
         a.href = url
-        a.download = `${profile?.fullName || "Profile"}_Profile.pdf`
+        // Sanitize filename consistently
+        const sanitizedName = (profile?.fullName || "Profile")
+          .replace(/[/\\:*?"<>|]/g, '')
+          .replace(/\s+/g, '_')
+          .substring(0, 50)
+        a.download = `${sanitizedName}_Profile.pdf`
         document.body.appendChild(a)
         a.click()
         a.remove()
