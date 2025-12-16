@@ -124,6 +124,7 @@ router.put("/", auth, authorize("company"), async (req, res) => {
       "size",
       "founded",
       "logo",
+      "profilePicture",
     ];
     const filteredUpdates = {};
 

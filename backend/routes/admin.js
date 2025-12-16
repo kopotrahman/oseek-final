@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { User, JobSeekerProfile, CompanyProfile, Application, Wishlist, ActivityLog, Job } = require("../models");
+const { User, JobSeekerProfile, CompanyProfile, Application, Wishlist, ActivityLog, Job, Notification } = require("../models");
 const { auth, authorize } = require("../middleware");
 
 /**
@@ -399,6 +399,203 @@ router.delete("/users/:id", auth, authorize("admin"), async (req, res) => {
     });
   } catch (error) {
     console.error("Delete user error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/jobs:
+ *   get:
+ *     summary: Get all jobs (admin only)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by job title or company name
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [open, closed, paused]
+ *         description: Filter by job status
+ *     responses:
+ *       200:
+ *         description: List of jobs
+ *       403:
+ *         description: Forbidden - admin only
+ */
+router.get("/jobs", auth, authorize("admin"), async (req, res) => {
+  try {
+    const { search, status } = req.query;
+    let query = {};
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const jobs = await Job.find(query)
+      .populate("company", "name email")
+      .sort({ createdAt: -1 });
+
+    // Get company names from profiles
+    const jobsWithCompanyNames = await Promise.all(
+      jobs.map(async (job) => {
+        const companyProfile = await CompanyProfile.findOne({ user: job.company._id });
+        return {
+          ...job.toObject(),
+          companyName: companyProfile?.companyName || job.company.name,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      count: jobsWithCompanyNames.length,
+      jobs: jobsWithCompanyNames,
+    });
+  } catch (error) {
+    console.error("Get jobs error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/jobs/{id}:
+ *   delete:
+ *     summary: Delete a job post (admin only)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Job ID
+ *     responses:
+ *       200:
+ *         description: Job deleted successfully
+ *       403:
+ *         description: Forbidden - admin only
+ *       404:
+ *         description: Job not found
+ */
+router.delete("/jobs/:id", auth, authorize("admin"), async (req, res) => {
+  try {
+    const job = await Job.findById(req.params.id);
+
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    // Delete applications for this job
+    await Application.deleteMany({ job: req.params.id });
+    
+    // Delete wishlist items for this job
+    await Wishlist.deleteMany({ job: req.params.id });
+
+    // Delete the job
+    await Job.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: "Job deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete job error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/feedback:
+ *   post:
+ *     summary: Send feedback to a company (admin only)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - companyId
+ *               - title
+ *               - message
+ *             properties:
+ *               companyId:
+ *                 type: string
+ *                 description: Company user ID
+ *               title:
+ *                 type: string
+ *                 description: Feedback title
+ *               message:
+ *                 type: string
+ *                 description: Feedback message
+ *               jobId:
+ *                 type: string
+ *                 description: Related job ID (optional)
+ *     responses:
+ *       200:
+ *         description: Feedback sent successfully
+ *       403:
+ *         description: Forbidden - admin only
+ *       404:
+ *         description: Company not found
+ */
+router.post("/feedback", auth, authorize("admin"), async (req, res) => {
+  try {
+    const { companyId, title, message, jobId } = req.body;
+
+    if (!companyId || !title || !message) {
+      return res.status(400).json({ message: "Company ID, title, and message are required" });
+    }
+
+    // Verify company exists
+    const company = await User.findById(companyId);
+    if (!company) {
+      return res.status(404).json({ message: "Company not found" });
+    }
+
+    if (company.role !== "company") {
+      return res.status(400).json({ message: "User is not a company" });
+    }
+
+    // Create notification
+    const notification = new Notification({
+      user: companyId,
+      type: "admin_feedback",
+      title,
+      message,
+      relatedJob: jobId || undefined,
+    });
+
+    await notification.save();
+
+    res.json({
+      success: true,
+      message: "Feedback sent successfully",
+      notification,
+    });
+  } catch (error) {
+    console.error("Send feedback error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });

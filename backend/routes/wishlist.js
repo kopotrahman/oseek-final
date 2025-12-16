@@ -18,16 +18,30 @@ const { auth, authorize } = require("../middleware");
 router.get("/", auth, authorize("seeker"), async (req, res) => {
   try {
     const wishlistItems = await Wishlist.find({ user: req.user._id })
-      .populate({
-        path: "job",
-        populate: {
-          path: "company",
-          select: "name",
-        },
-      })
+      .populate("job")
       .sort({ createdAt: -1 });
 
-    res.json(wishlistItems);
+    // Manually populate company information
+    const { CompanyProfile } = require("../models");
+    const itemsWithCompany = await Promise.all(
+      wishlistItems.map(async (item) => {
+        if (item.job) {
+          const companyProfile = await CompanyProfile.findOne({ user: item.job.company });
+          return {
+            ...item.toObject(),
+            job: {
+              ...item.job.toObject(),
+              company: {
+                companyName: companyProfile?.companyName || "Unknown Company",
+              },
+            },
+          };
+        }
+        return item.toObject();
+      })
+    );
+
+    res.json(itemsWithCompany);
   } catch (error) {
     console.error("Get wishlist error:", error);
     res.status(500).json({ message: "Server error" });

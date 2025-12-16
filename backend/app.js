@@ -17,6 +17,8 @@ const {
   dashboardRoutes,
   adminRoutes,
   wishlistRoutes,
+  notificationRoutes,
+  connectionRoutes,
 } = require("./routes");
 
 const app = express();
@@ -54,6 +56,8 @@ app.use("/api/applications", sensitiveOpLimiter, applicationRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/admin", sensitiveOpLimiter, adminRoutes);
 app.use("/api/wishlist", wishlistRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/connections", connectionRoutes);
 
 
 if (!mongoose.connection.readyState) {
@@ -77,6 +81,8 @@ app.get("/", (req, res) =>
       dashboard: "/api/dashboard",
       admin: "/api/admin",
       wishlist: "/api/wishlist",
+      notifications: "/api/notifications",
+      connections: "/api/connections",
     },
   })
 );
