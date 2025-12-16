@@ -147,7 +147,7 @@ const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  */
 router.get("/", async (req, res) => {
   try {
-    const { q, type, location } = req.query;
+    const { q, type, location, salaryMin, salaryMax, experience } = req.query;
     
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
@@ -172,6 +172,23 @@ router.get("/", async (req, res) => {
     if (location) {
       const escapedLocation = escapeRegex(location);
       query.location = { $regex: escapedLocation, $options: "i" };
+    }
+
+    // Filter by salary range
+    if (salaryMin || salaryMax) {
+      query["salary.max"] = query["salary.max"] || {};
+      if (salaryMin) {
+        query["salary.max"].$gte = parseInt(salaryMin);
+      }
+      if (salaryMax) {
+        query["salary.max"].$lte = parseInt(salaryMax);
+      }
+    }
+
+    // Filter by experience level
+    if (experience) {
+      const escapedExp = escapeRegex(experience);
+      query.experience = { $regex: escapedExp, $options: "i" };
     }
 
     const skip = (page - 1) * limit;

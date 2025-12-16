@@ -1,4 +1,4 @@
-import { LogOut, Briefcase, Heart } from "lucide-react";
+import { LogOut, Briefcase, Heart, Clock } from "lucide-react";
 import { useSyncExternalStore, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -61,6 +61,15 @@ export default function Header() {
                 >
                   <Heart className="w-4 h-4" />
                   Wishlist
+                </button>
+              )}
+              {!isAdmin && (
+                <button
+                  onClick={() => navigate("/activity")}
+                  className="flex items-center gap-2 text-text-secondary hover:text-text transition"
+                >
+                  <Clock className="w-4 h-4" />
+                  Activity
                 </button>
               )}
               <button

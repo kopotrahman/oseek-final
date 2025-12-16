@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard"
 import AdminDashboard from "./pages/AdminDashboard"
 import Jobs from "./pages/Jobs"
 import Wishlist from "./pages/Wishlist"
+import ActivityHistory from "./pages/ActivityHistory"
 import ProtectedRoute from "./components/ProtectedRoute"
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/wishlist" element={<Wishlist />} />
+          <Route path="/activity" element={<ActivityHistory />} />
         </Route>
       </Routes>
     </Router>
