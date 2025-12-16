@@ -12,6 +12,8 @@ import ActivityHistory from "./pages/ActivityHistory"
 import Notifications from "./pages/Notifications"
 import Connections from "./pages/Connections"
 import ConnectionProfile from "./pages/ConnectionProfile"
+import Settings from "./pages/Settings"
+import ProfileViews from "./pages/ProfileViews"
 import ProtectedRoute from "./components/ProtectedRoute"
 
 export default function App() {
@@ -32,6 +34,8 @@ export default function App() {
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/connections" element={<Connections />} />
           <Route path="/connections/profile/:userId" element={<ConnectionProfile />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/profile-views" element={<ProfileViews />} />
         </Route>
       </Routes>
     </Router>
