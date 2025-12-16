@@ -19,7 +19,7 @@ export default function Wishlist() {
       return
     }
     fetchWishlist()
-  }, [user, navigate])
+  }, [navigate]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchWishlist = async () => {
     setLoading(true)

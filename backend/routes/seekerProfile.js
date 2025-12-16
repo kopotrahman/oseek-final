@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const PDFDocument = require("pdfkit");
-const { JobSeekerProfile, Application, Job } = require("../models");
+const { JobSeekerProfile, Application, Job, ProfileView } = require("../models");
 const { auth, authorize } = require("../middleware");
 
 /**
@@ -895,6 +895,74 @@ router.get("/:userId/download-cv", auth, authorize("company"), async (req, res) 
 
 /**
  * @swagger
+ * /api/profile/seeker/{id}/download-profile-pdf:
+ *   get:
+ *     summary: Download job seeker profile as PDF (web view format)
+ *     tags: [Job Seeker Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Job seeker profile ID or user ID
+ *     responses:
+ *       200:
+ *         description: Profile PDF file
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       404:
+ *         description: Profile not found
+ */
+router.get("/:id/download-profile-pdf", auth, async (req, res) => {
+  try {
+    const profile = await JobSeekerProfile.findById(req.params.id)
+      .populate('user', 'name');
+    
+    if (!profile) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
+
+    // Create PDF document
+    const doc = new PDFDocument({ 
+      margin: 50,
+      size: 'A4'
+    });
+
+    // Sanitize filename - consistent with frontend
+    const sanitizedName = (profile.fullName || "Profile")
+      .replace(/[/\\:*?"<>|]/g, "")
+      .replace(/\s+/g, "_")
+      .substring(0, 50);
+    
+    // Set response headers
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${sanitizedName}_Profile.pdf"`
+    );
+
+    // Pipe PDF to response
+    doc.pipe(res);
+
+    // Generate profile content (similar to CV but formatted as web view)
+    generateCVContent(doc, profile);
+
+    // Finalize PDF
+    doc.end();
+  } catch (error) {
+    console.error("Download profile PDF error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
  * /api/profile/seeker/{id}:
  *   get:
  *     summary: Get public job seeker profile by ID
@@ -912,19 +980,126 @@ router.get("/:userId/download-cv", auth, authorize("company"), async (req, res) 
  *       404:
  *         description: Profile not found
  */
-router.get("/:id", async (req, res) => {
+router.get("/:id", auth, async (req, res) => {
   try {
     const profile = await JobSeekerProfile.findById(req.params.id)
       .populate('user', 'name')
-      .select('-email -phone -profileViews'); // Exclude sensitive fields for public view
+      .select('-email -phone'); // Exclude sensitive fields for public view
     
     if (!profile) {
       return res.status(404).json({ message: "Profile not found" });
     }
 
+    // Track profile view if viewer is not the profile owner
+    if (req.user && profile.user._id.toString() !== req.user._id.toString()) {
+      try {
+        // Check if this user already viewed this profile today
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const existingView = await ProfileView.findOne({
+          profile: profile.user._id,
+          viewer: req.user._id,
+          viewedAt: { $gte: today }
+        });
+
+        // Only create a new view record if they haven't viewed today
+        if (!existingView) {
+          await ProfileView.create({
+            profile: profile.user._id,
+            viewer: req.user._id,
+            viewerRole: req.user.role,
+          });
+        }
+      } catch (viewError) {
+        console.error("Error tracking profile view:", viewError);
+        // Don't fail the request if view tracking fails
+      }
+    }
+
     res.json(profile);
   } catch (error) {
     console.error("Get seeker profile error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/profile/seeker/views/list:
+ *   get:
+ *     summary: Get list of profile views for logged-in seeker
+ *     tags: [Job Seeker Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of profile views
+ *       403:
+ *         description: Not authorized
+ */
+router.get("/views/list", auth, authorize("seeker"), async (req, res) => {
+  try {
+    const { CompanyProfile: CompanyProfileModel } = require("../models");
+    
+    const views = await ProfileView.find({ profile: req.user._id })
+      .populate({
+        path: 'viewer',
+        select: 'name email role'
+      })
+      .sort({ viewedAt: -1 })
+      .limit(100);
+
+    // Enhance with profile information based on viewer role
+    const enhancedViews = await Promise.all(
+      views.map(async (view) => {
+        const viewObj = view.toObject();
+        
+        if (view.viewerRole === 'company') {
+          const companyProfile = await CompanyProfileModel.findOne({ 
+            user: view.viewer._id 
+          }).select('companyName location industry profilePicture');
+          
+          viewObj.viewerProfile = companyProfile;
+        } else if (view.viewerRole === 'seeker') {
+          const seekerProfile = await JobSeekerProfile.findOne({ 
+            user: view.viewer._id 
+          }).select('fullName headline location skills profilePicture');
+          
+          viewObj.viewerProfile = seekerProfile;
+        }
+        
+        return viewObj;
+      })
+    );
+
+    res.json(enhancedViews);
+  } catch (error) {
+    console.error("Get profile views error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/profile/seeker/views/count:
+ *   get:
+ *     summary: Get total profile view count for logged-in seeker
+ *     tags: [Job Seeker Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profile view count
+ *       403:
+ *         description: Not authorized
+ */
+router.get("/views/count", auth, authorize("seeker"), async (req, res) => {
+  try {
+    const count = await ProfileView.countDocuments({ profile: req.user._id });
+    res.json({ count });
+  } catch (error) {
+    console.error("Get profile view count error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });

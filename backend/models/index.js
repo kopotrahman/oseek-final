@@ -7,6 +7,7 @@ const Wishlist = require("./Wishlist");
 const ActivityLog = require("./ActivityLog");
 const Notification = require("./Notification");
 const Connection = require("./Connection");
+const ProfileView = require("./ProfileView");
 
 module.exports = {
   User,
@@ -18,4 +19,5 @@ module.exports = {
   ActivityLog,
   Notification,
   Connection,
+  ProfileView,
 };

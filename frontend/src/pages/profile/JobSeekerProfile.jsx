@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import Header from "../../components/Header"
-import { Plus, Trash2, Edit2, Save, X } from "lucide-react"
+import { Plus, Trash2, Edit2, Save, X, Users } from "lucide-react"
 import { API_ENDPOINTS, getAuthHeaders } from "../../config/api"
 
 export default function JobSeekerProfile() {
@@ -34,6 +34,10 @@ export default function JobSeekerProfile() {
   const [deletePassword, setDeletePassword] = useState("")
   const [deletingAccount, setDeletingAccount] = useState(false)
   
+  // Connections states
+  const [connections, setConnections] = useState([])
+  const [loadingConnections, setLoadingConnections] = useState(false)
+  
   // Ref for timeout cleanup
   const timeoutRef = useRef(null)
   
@@ -53,6 +57,7 @@ export default function JobSeekerProfile() {
 
   useEffect(() => {
     fetchProfile()
+    fetchConnections()
   }, [])
 
   const fetchProfile = async () => {
@@ -79,6 +84,26 @@ export default function JobSeekerProfile() {
       setError("Network error. Please try again later.")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchConnections = async () => {
+    setLoadingConnections(true)
+    try {
+      const response = await fetch(API_ENDPOINTS.connections.list, {
+        headers: getAuthHeaders(),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        // Filter only accepted connections
+        const acceptedConnections = data.filter(conn => conn.status === 'accepted')
+        setConnections(acceptedConnections)
+      }
+    } catch (err) {
+      console.error("Fetch connections error:", err)
+    } finally {
+      setLoadingConnections(false)
     }
   }
 
@@ -891,6 +916,95 @@ export default function JobSeekerProfile() {
                 <p className="text-[#a0a0c0] bg-[#0f0f1e] rounded-lg p-6">No education added yet</p>
               )}
             </div>
+          </div>
+
+          {/* Connections */}
+          <div className="mt-8 pt-8 border-t border-[#2d2d4d]">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-3">
+                <Users size={24} className="text-[#0066ff]" />
+                <h2 className="text-2xl font-bold text-[#e0e0ff]">My Connections</h2>
+                {connections.length > 0 && (
+                  <span className="px-3 py-1 bg-[#0066ff]/20 text-[#0066ff] rounded-full text-sm font-semibold">
+                    {connections.length}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => navigate('/connections')}
+                className="text-[#0066ff] hover:text-[#00d9ff] transition text-sm font-semibold"
+              >
+                View All →
+              </button>
+            </div>
+            
+            {loadingConnections ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#0066ff]"></div>
+              </div>
+            ) : connections.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {(() => {
+                  // Parse user once outside the map
+                  const user = JSON.parse(localStorage.getItem("user") || "{}")
+                  
+                  return connections.slice(0, 6).map((connection) => {
+                    // Determine if the current user is the requester or recipient
+                    const otherUser = connection.requester._id === user._id 
+                      ? connection.recipient 
+                      : connection.requester
+                    const otherProfile = connection.requester._id === user._id
+                      ? connection.recipientProfile
+                      : connection.requesterProfile
+                  
+                  return (
+                    <div
+                      key={connection._id}
+                      onClick={() => navigate(`/connections/profile/${otherUser._id}`)}
+                      className="bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg p-4 hover:border-[#0066ff] transition cursor-pointer"
+                    >
+                      <div className="flex items-start gap-3">
+                        {otherProfile?.profilePicture && (
+                          <img
+                            src={otherProfile.profilePicture}
+                            alt={otherProfile.fullName}
+                            className="w-12 h-12 rounded-full object-cover border-2 border-[#0066ff]"
+                          />
+                        )}
+                        {!otherProfile?.profilePicture && (
+                          <div className="w-12 h-12 rounded-full bg-[#0066ff]/20 flex items-center justify-center border-2 border-[#0066ff]">
+                            <Users size={20} className="text-[#0066ff]" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-[#e0e0ff] truncate">
+                            {otherProfile?.fullName || otherUser.name}
+                          </h3>
+                          {otherProfile?.headline && (
+                            <p className="text-[#a0a0c0] text-sm truncate">{otherProfile.headline}</p>
+                          )}
+                          {otherProfile?.location && (
+                            <p className="text-[#a0a0c0] text-xs mt-1">📍 {otherProfile.location}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    )
+                  })
+                })()}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-[#0f0f1e] rounded-lg border border-[#2d2d4d]">
+                <Users size={48} className="text-[#2d2d4d] mx-auto mb-4" />
+                <p className="text-[#a0a0c0] mb-4">You don't have any connections yet</p>
+                <button
+                  onClick={() => navigate('/connections')}
+                  className="px-6 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition"
+                >
+                  Find Connections
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Account Settings */}

@@ -16,6 +16,8 @@ const notificationSchema = new mongoose.Schema(
         "application_update",
         "interview_scheduled",
         "wishlist_alert",
+        "new_application",
+        "application_status_update",
       ],
       required: true,
     },
