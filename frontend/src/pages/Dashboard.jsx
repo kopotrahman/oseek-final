@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import Header from "../components/Header"
-import { BarChart3, Users, FileText, Settings, Briefcase, Clock, Eye, Heart, UserCheck } from "lucide-react"
+import { BarChart3, Users, FileText, Settings, Briefcase, Clock, Eye, Heart, UserCheck, Sparkles, MapPin, DollarSign } from "lucide-react"
 import { API_ENDPOINTS, getAuthHeaders } from "../config/api"
 
 export default function Dashboard() {
@@ -10,6 +10,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [recommendations, setRecommendations] = useState([])
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false)
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -35,6 +37,32 @@ export default function Dashboard() {
 
     fetchStats()
   }, [])
+
+  useEffect(() => {
+    if (user?.role === "seeker") {
+      fetchRecommendations()
+    }
+  }, [user?.role])
+
+  const fetchRecommendations = async () => {
+    setLoadingRecommendations(true)
+    try {
+      const response = await fetch(`${API_ENDPOINTS.jobs.recommendations}?limit=5`, {
+        headers: getAuthHeaders(),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setRecommendations(data.recommendations || [])
+      } else {
+        console.log("Failed to fetch recommendations:", data.message)
+      }
+    } catch (err) {
+      console.error("Fetch recommendations error:", err)
+    } finally {
+      setLoadingRecommendations(false)
+    }
+  }
 
   const renderSeekerDashboard = () => (
     <>
@@ -103,6 +131,104 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* AI-Powered Job Recommendations */}
+      <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 neon-glow mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <Sparkles size={28} className="text-[#00d9ff]" />
+            <h2 className="text-2xl font-bold text-[#e0e0ff]">AI-Powered Recommendations</h2>
+          </div>
+          {recommendations.length > 0 && (
+            <button
+              onClick={() => navigate('/jobs')}
+              className="text-[#0066ff] hover:text-[#00d9ff] transition text-sm font-semibold"
+            >
+              View All Jobs →
+            </button>
+          )}
+        </div>
+
+        {loadingRecommendations ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#0066ff]"></div>
+          </div>
+        ) : recommendations.length > 0 ? (
+          <div className="space-y-4">
+            {recommendations.map((rec, idx) => {
+              const job = rec.job
+              return (
+                <div
+                  key={job._id}
+                  className="bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg p-5 hover:border-[#0066ff] transition cursor-pointer"
+                  onClick={() => navigate(`/jobs#${job._id}`)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-[#e0e0ff] mb-1">{job.title}</h3>
+                      <div className="flex items-center gap-4 text-[#a0a0c0] text-sm">
+                        <span className="flex items-center gap-1">
+                          <MapPin size={14} />
+                          {job.location}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Briefcase size={14} />
+                          {job.type}
+                        </span>
+                        {job.salary?.min && (
+                          <span className="flex items-center gap-1">
+                            <DollarSign size={14} />
+                            {job.salary.min}-{job.salary.max} {job.salary.currency}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[#00d9ff] font-bold text-lg">
+                        {Math.round(rec.score * 100)}%
+                      </div>
+                      <div className="text-[#a0a0c0] text-xs">Match</div>
+                    </div>
+                  </div>
+
+                  {/* Match Breakdown */}
+                  <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-[#2d2d4d]">
+                    <div className="text-center">
+                      <div className="text-[#a0a0c0] text-xs mb-1">Skills</div>
+                      <div className="text-[#e0e0ff] text-sm font-semibold">{rec.breakdown.skillMatch}%</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[#a0a0c0] text-xs mb-1">Experience</div>
+                      <div className="text-[#e0e0ff] text-sm font-semibold">{rec.breakdown.experienceMatch}%</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[#a0a0c0] text-xs mb-1">Location</div>
+                      <div className="text-[#e0e0ff] text-sm font-semibold">{rec.breakdown.locationMatch}%</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[#a0a0c0] text-xs mb-1">Keywords</div>
+                      <div className="text-[#e0e0ff] text-sm font-semibold">{rec.breakdown.keywordMatch}%</div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Sparkles size={48} className="text-[#2d2d4d] mx-auto mb-3" />
+            <p className="text-[#a0a0c0] mb-4">
+              Complete your profile to get personalized job recommendations powered by AI
+            </p>
+            <button
+              onClick={() => navigate('/profile/seeker')}
+              className="px-6 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition"
+            >
+              Complete Profile
+            </button>
+          </div>
+        )}
       </div>
     </>
   )
