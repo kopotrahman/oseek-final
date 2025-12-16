@@ -34,8 +34,14 @@ export default function Header() {
   useEffect(() => {
     if (token && (isCompany || isAdmin)) {
       fetchUnreadCount();
-      // Poll for new notifications every 30 seconds
-      const interval = setInterval(fetchUnreadCount, 30000);
+      
+      // Poll for new notifications every 30 seconds only when page is visible
+      const interval = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          fetchUnreadCount();
+        }
+      }, 30000);
+      
       return () => clearInterval(interval);
     }
   }, [token, isCompany, isAdmin]);

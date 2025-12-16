@@ -3,6 +3,11 @@ const router = express.Router();
 const { Notification } = require("../models");
 const { auth } = require("../middleware");
 
+// Constants for pagination limits
+const DEFAULT_NOTIFICATIONS_LIMIT = 50;
+const MIN_NOTIFICATIONS_LIMIT = 1;
+const MAX_NOTIFICATIONS_LIMIT = 100;
+
 /**
  * @swagger
  * /api/notifications:
@@ -36,7 +41,7 @@ router.get("/", auth, async (req, res) => {
       query.isRead = false;
     }
 
-    const maxLimit = Math.min(100, Math.max(1, parseInt(limit) || 50));
+    const maxLimit = Math.min(MAX_NOTIFICATIONS_LIMIT, Math.max(MIN_NOTIFICATIONS_LIMIT, parseInt(limit) || DEFAULT_NOTIFICATIONS_LIMIT));
 
     const notifications = await Notification.find(query)
       .populate("relatedJob", "title")
