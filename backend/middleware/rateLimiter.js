@@ -11,8 +11,8 @@ const apiLimiter = rateLimit({
 });
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
-  max: 1000,
+  windowMs: 1500 * 60 * 1000, 
+  max: 100000,
   message: {
     message: "Too many authentication attempts, please try again after 15 minutes",
   },

@@ -1,7 +1,8 @@
-import { LogOut, Briefcase, Heart, Clock, Bell } from "lucide-react";
+import { LogOut, Briefcase, Heart, Clock, Bell,LayoutDashboard } from "lucide-react";
 import { useSyncExternalStore, useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_ENDPOINTS, getAuthHeaders } from "../../config/api";
+import Dashboard from "@/pages/Dashboard";
 
 function subscribeToStorage(callback) {
   window.addEventListener("storage", callback);
@@ -122,6 +123,7 @@ export default function Header() {
                   className="relative flex items-center gap-2 text-text-secondary hover:text-text transition"
                 >
                   <Bell className="w-4 h-4" />
+                  Notifications
                   {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                       {unreadCount > 9 ? "9+" : unreadCount}
@@ -129,11 +131,11 @@ export default function Header() {
                   )}
                 </button>
               )}
-              <button
+              <button className="flex items-center gap-2 text-text-secondary hover:text-text transition"
                 onClick={() => navigate(isAdmin ? "/admin/dashboard" : "/dashboard")}
-                className="text-text-secondary hover:text-text transition"
-              >
-                Dashboard
+                
+              > <LayoutDashboard className="w-4 h-4"/>Dashboard
+                
               </button>
               <button
                 onClick={handleLogout}
