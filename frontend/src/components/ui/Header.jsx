@@ -1,4 +1,4 @@
-import { LogOut, Briefcase, Heart, Clock, Bell, LayoutDashboard, User } from "lucide-react";
+import { LogOut, Briefcase, Heart, Clock, Bell, LayoutDashboard, User, Menu, X } from "lucide-react";
 import { useSyncExternalStore, useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_ENDPOINTS, getAuthHeaders } from "../../config/api";
@@ -31,6 +31,7 @@ export default function Header() {
   const isCompany = user?.role === "company";
   
   const [unreadCount, setUnreadCount] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (token && (isCompany || isAdmin)) {
@@ -78,7 +79,8 @@ export default function Header() {
           OSEEK
         </div>
 
-        <nav className="flex items-center gap-8">
+        {/* Desktop Navigation */}
+        <nav className="hidden md:flex items-center gap-8">
           <button
             onClick={() => navigate("/jobs")}
             className="flex items-center gap-2 text-text-secondary hover:text-text transition"
@@ -172,7 +174,145 @@ export default function Header() {
             </>
           )}
         </nav>
+
+        {/* Mobile Menu Button */}
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="md:hidden p-2 text-text-secondary hover:text-text transition"
+        >
+          {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
       </div>
+
+      {/* Mobile Navigation */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-border bg-background">
+          <nav className="flex flex-col px-4 py-4 space-y-2">
+            <button
+              onClick={() => {
+                navigate("/jobs");
+                setMobileMenuOpen(false);
+              }}
+              className="flex items-center gap-2 px-4 py-3 text-text-secondary hover:text-text hover:bg-surface rounded-lg transition text-left"
+            >
+              <Briefcase className="w-4 h-4" />
+              Jobs
+            </button>
+            {token ? (
+              <>
+                {isSeeker && (
+                  <>
+                    <button
+                      onClick={() => {
+                        navigate("/wishlist");
+                        setMobileMenuOpen(false);
+                      }}
+                      className="flex items-center gap-2 px-4 py-3 text-text-secondary hover:text-text hover:bg-surface rounded-lg transition text-left"
+                    >
+                      <Heart className="w-4 h-4" />
+                      Wishlist
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigate("/connections");
+                        setMobileMenuOpen(false);
+                      }}
+                      className="flex items-center gap-2 px-4 py-3 text-text-secondary hover:text-text hover:bg-surface rounded-lg transition text-left"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      Connections
+                    </button>
+                  </>
+                )}
+                {!isAdmin && (
+                  <button
+                    onClick={() => {
+                      navigate("/activity");
+                      setMobileMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2 px-4 py-3 text-text-secondary hover:text-text hover:bg-surface rounded-lg transition text-left"
+                  >
+                    <Clock className="w-4 h-4" />
+                    Activity
+                  </button>
+                )}
+                {(isCompany || isAdmin) && (
+                  <button
+                    onClick={() => {
+                      navigate("/notifications");
+                      setMobileMenuOpen(false);
+                    }}
+                    className="relative flex items-center gap-2 px-4 py-3 text-text-secondary hover:text-text hover:bg-surface rounded-lg transition text-left"
+                  >
+                    <Bell className="w-4 h-4" />
+                    Notifications
+                    {unreadCount > 0 && (
+                      <span className="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </button>
+                )}
+                {!isAdmin && (
+                  <button
+                    onClick={() => {
+                      navigate(isSeeker ? "/profile/seeker" : "/profile/company");
+                      setMobileMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2 px-4 py-3 text-text-secondary hover:text-text hover:bg-surface rounded-lg transition text-left"
+                  >
+                    <User className="w-4 h-4" />
+                    Profile
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    navigate(isAdmin ? "/admin/dashboard" : "/dashboard");
+                    setMobileMenuOpen(false);
+                  }}
+                  className="flex items-center gap-2 px-4 py-3 text-text-secondary hover:text-text hover:bg-surface rounded-lg transition text-left"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="flex items-center gap-2 px-4 py-3 text-text-secondary hover:text-text hover:bg-surface rounded-lg transition text-left border-t border-border mt-2 pt-4"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    navigate("/auth/login");
+                    setMobileMenuOpen(false);
+                  }}
+                  className="px-4 py-3 text-text-secondary hover:text-text hover:bg-surface rounded-lg transition text-left"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => {
+                    navigate("/auth/signup");
+                    setMobileMenuOpen(false);
+                  }}
+                  className="px-4 py-3 bg-primary text-background rounded-lg font-semibold hover:bg-primary-dark transition text-center"
+                >
+                  Sign Up
+                </button>
+              </>
+            )}
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

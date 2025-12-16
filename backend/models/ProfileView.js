@@ -28,7 +28,7 @@ const profileViewSchema = new mongoose.Schema(
   }
 );
 
-// Compound index to prevent duplicate views from same user on the same day
+// Compound index for efficient querying of views by profile, viewer, and time
 profileViewSchema.index({ profile: 1, viewer: 1, viewedAt: 1 });
 
 // Index for efficient querying

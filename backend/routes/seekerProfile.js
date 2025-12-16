@@ -972,6 +972,8 @@ router.get("/:id", auth, async (req, res) => {
  */
 router.get("/views/list", auth, authorize("seeker"), async (req, res) => {
   try {
+    const { CompanyProfile: CompanyProfileModel } = require("../models");
+    
     const views = await ProfileView.find({ profile: req.user._id })
       .populate({
         path: 'viewer',
@@ -986,7 +988,7 @@ router.get("/views/list", auth, authorize("seeker"), async (req, res) => {
         const viewObj = view.toObject();
         
         if (view.viewerRole === 'company') {
-          const companyProfile = await require("../models").CompanyProfile.findOne({ 
+          const companyProfile = await CompanyProfileModel.findOne({ 
             user: view.viewer._id 
           }).select('companyName location industry profilePicture');
           
