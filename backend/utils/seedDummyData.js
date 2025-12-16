@@ -2,11 +2,18 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const { User, JobSeekerProfile, CompanyProfile, Job, Application, ActivityLog, ProfileView, Notification } = require("../models");
 
+/**
+ * WARNING: This is a development-only seeding script for testing purposes.
+ * DO NOT use this in production environments.
+ * It creates test users with hardcoded passwords and should only be used in development/staging.
+ */
 const seedDummyData = async () => {
   try {
     console.log("🌱 Starting database seeding with dummy data...");
+    console.log("⚠️  WARNING: This is for development/testing only!");
 
     // Create test seeker with specific email
+    // Note: Using hardcoded password for testing - NOT for production use
     const seekerPassword = await bcrypt.hash("testpass123", 10);
     let testSeeker = await User.findOne({ email: "muztahiddurjoy99@gmail.com" });
     

@@ -526,7 +526,9 @@ export default function Jobs() {
   }
 
   const handleDeleteJob = async (jobId, jobTitle) => {
-    if (!window.confirm(`Are you sure you want to delete "${jobTitle}"? This action cannot be undone.`)) {
+    // Sanitize job title for display in confirm dialog to prevent XSS
+    const sanitizedTitle = jobTitle.replace(/[<>]/g, '');
+    if (!window.confirm(`Are you sure you want to delete "${sanitizedTitle}"? This action cannot be undone.`)) {
       return
     }
 
@@ -1373,8 +1375,8 @@ export default function Jobs() {
 
       {/* Interview Invitation Modal */}
       {interviewModal.show && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-md w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto">
+          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-md w-full m-4 my-8">
             <h2 className="text-2xl font-bold text-[#e0e0ff] mb-4">Call for Interview</h2>
             <p className="text-[#a0a0c0] mb-4">Send an interview invitation to the applicant</p>
             
@@ -1415,8 +1417,8 @@ export default function Jobs() {
 
       {/* Bulk Email Modal */}
       {bulkEmailModal.show && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-lg w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto">
+          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-lg w-full m-4 my-8">
             <h2 className="text-2xl font-bold text-[#e0e0ff] mb-4">Send Bulk Email</h2>
             <p className="text-[#a0a0c0] mb-4">Send an email to all applicants for this job</p>
             
@@ -1485,8 +1487,8 @@ export default function Jobs() {
 
       {/* Edit Job Modal */}
       {editingJobId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-3xl w-full my-8">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto">
+          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-3xl w-full m-4 my-8">
             <h2 className="text-2xl font-bold text-[#e0e0ff] mb-6">Edit Job</h2>
             
             {jobFormError && (
@@ -1640,8 +1642,8 @@ export default function Jobs() {
 
       {/* Applicant Profile Modal */}
       {profileModal.show && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-3xl w-full my-8">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto">
+          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-3xl w-full m-4 my-8">
             <div className="flex justify-between items-start mb-6">
               <div className="flex-1">
                 <h2 className="text-2xl font-bold text-[#e0e0ff]">Applicant Profile</h2>
