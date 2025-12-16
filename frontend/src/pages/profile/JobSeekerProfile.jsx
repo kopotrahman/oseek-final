@@ -24,6 +24,14 @@ export default function JobSeekerProfile() {
   const [eduForm, setEduForm] = useState({ school: "", degree: "", year: "" })
   const [editingEduId, setEditingEduId] = useState(null)
   
+  // Settings states
+  const [showPasswordForm, setShowPasswordForm] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" })
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deletePassword, setDeletePassword] = useState("")
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  
   // Ref for timeout cleanup
   const timeoutRef = useRef(null)
   
@@ -362,6 +370,81 @@ export default function JobSeekerProfile() {
       }
     }
     reader.readAsDataURL(file)
+  }
+
+  const changePassword = async () => {
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      setError("All password fields are required")
+      return
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setError("New passwords do not match")
+      return
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      setError("New password must be at least 6 characters")
+      return
+    }
+
+    setChangingPassword(true)
+    setError("")
+    try {
+      const response = await fetch(API_ENDPOINTS.auth.changePassword, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        }),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        showSuccess("Password changed successfully!")
+        setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
+        setShowPasswordForm(false)
+      } else {
+        setError(data.message || "Failed to change password")
+      }
+    } catch (err) {
+      console.error("Change password error:", err)
+      setError("Network error. Please try again later.")
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
+  const deleteAccount = async () => {
+    if (!deletePassword) {
+      setError("Password is required to delete account")
+      return
+    }
+
+    setDeletingAccount(true)
+    setError("")
+    try {
+      const response = await fetch(API_ENDPOINTS.auth.deleteAccount, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ password: deletePassword }),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        // Clear local storage and redirect to home
+        localStorage.clear()
+        window.location.href = "/"
+      } else {
+        setError(data.message || "Failed to delete account")
+      }
+    } catch (err) {
+      console.error("Delete account error:", err)
+      setError("Network error. Please try again later.")
+    } finally {
+      setDeletingAccount(false)
+    }
   }
 
   if (loading) {
@@ -804,6 +887,101 @@ export default function JobSeekerProfile() {
               ))}
               {(!profile?.education || profile.education.length === 0) && !showEduForm && (
                 <p className="text-[#a0a0c0] bg-[#0f0f1e] rounded-lg p-6">No education added yet</p>
+              )}
+            </div>
+          </div>
+
+          {/* Account Settings */}
+          <div className="mt-8 pt-8 border-t border-[#2d2d4d]">
+            <h2 className="text-2xl font-bold text-[#e0e0ff] mb-6">Account Settings</h2>
+            
+            {/* Change Password */}
+            <div className="mb-6">
+              <button
+                onClick={() => setShowPasswordForm(!showPasswordForm)}
+                className="px-4 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition"
+              >
+                {showPasswordForm ? "Cancel" : "Change Password"}
+              </button>
+
+              {showPasswordForm && (
+                <div className="mt-4 bg-[#0f0f1e] rounded-lg p-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-[#a0a0c0] mb-2">Current Password</label>
+                      <input
+                        type="password"
+                        value={passwordForm.currentPassword}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                        className="w-full px-4 py-2 bg-[#16213e] border border-[#2d2d4d] rounded-lg text-[#e0e0ff] focus:border-[#0066ff] outline-none"
+                        placeholder="Enter current password"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[#a0a0c0] mb-2">New Password</label>
+                      <input
+                        type="password"
+                        value={passwordForm.newPassword}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                        className="w-full px-4 py-2 bg-[#16213e] border border-[#2d2d4d] rounded-lg text-[#e0e0ff] focus:border-[#0066ff] outline-none"
+                        placeholder="Enter new password (min 6 characters)"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[#a0a0c0] mb-2">Confirm New Password</label>
+                      <input
+                        type="password"
+                        value={passwordForm.confirmPassword}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                        className="w-full px-4 py-2 bg-[#16213e] border border-[#2d2d4d] rounded-lg text-[#e0e0ff] focus:border-[#0066ff] outline-none"
+                        placeholder="Confirm new password"
+                      />
+                    </div>
+                    <button
+                      onClick={changePassword}
+                      disabled={changingPassword}
+                      className="px-6 py-2 bg-[#00d9ff] text-[#0f0f1e] rounded-lg font-semibold hover:bg-[#00b8d4] transition disabled:opacity-50"
+                    >
+                      {changingPassword ? "Changing..." : "Update Password"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Delete Account */}
+            <div className="mt-6">
+              <button
+                onClick={() => setShowDeleteConfirm(!showDeleteConfirm)}
+                className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/50 rounded-lg font-semibold hover:bg-red-500/30 transition"
+              >
+                {showDeleteConfirm ? "Cancel" : "Delete Account"}
+              </button>
+
+              {showDeleteConfirm && (
+                <div className="mt-4 bg-red-500/10 border border-red-500/50 rounded-lg p-6">
+                  <h3 className="text-lg font-bold text-red-400 mb-2">⚠️ Warning</h3>
+                  <p className="text-[#a0a0c0] mb-4">
+                    This action is permanent and cannot be undone. All your data including profile, applications, and saved jobs will be deleted.
+                  </p>
+                  <div className="mb-4">
+                    <label className="block text-[#a0a0c0] mb-2">Enter your password to confirm</label>
+                    <input
+                      type="password"
+                      value={deletePassword}
+                      onChange={(e) => setDeletePassword(e.target.value)}
+                      className="w-full px-4 py-2 bg-[#16213e] border border-red-500/50 rounded-lg text-[#e0e0ff] focus:border-red-500 outline-none"
+                      placeholder="Enter password"
+                    />
+                  </div>
+                  <button
+                    onClick={deleteAccount}
+                    disabled={deletingAccount}
+                    className="px-6 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition disabled:opacity-50"
+                  >
+                    {deletingAccount ? "Deleting..." : "Permanently Delete Account"}
+                  </button>
+                </div>
               )}
             </div>
           </div>

@@ -7,6 +7,8 @@ export const API_ENDPOINTS = {
     login: `${API_BASE_URL}/auth/login`,
     signup: `${API_BASE_URL}/auth/signup`,
     me: `${API_BASE_URL}/auth/me`,
+    changePassword: `${API_BASE_URL}/auth/change-password`,
+    deleteAccount: `${API_BASE_URL}/auth/delete-account`,
   },
   profile: {
     seeker: {
@@ -37,6 +39,7 @@ export const API_ENDPOINTS = {
     update: (id) => `${API_BASE_URL}/jobs/${id}`,
     delete: (id) => `${API_BASE_URL}/jobs/${id}`,
     myJobs: `${API_BASE_URL}/jobs/company/my-jobs`,
+    recommendations: `${API_BASE_URL}/jobs/recommendations`,
   },
   applications: {
     apply: `${API_BASE_URL}/applications`,

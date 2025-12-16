@@ -3,6 +3,7 @@ const router = express.Router();
 const { Job, Application, CompanyProfile, Wishlist, User } = require("../models");
 const { auth, authorize } = require("../middleware");
 const { sendWishlistNotification } = require("../utils/emailService");
+const { getRecommendedJobs } = require("../utils/recommendationService");
 
 
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -500,6 +501,83 @@ router.delete("/:id", auth, authorize("company"), async (req, res) => {
     res.json({ message: "Job deleted successfully" });
   } catch (error) {
     console.error("Delete job error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/jobs/recommendations:
+ *   get:
+ *     summary: Get AI-powered job recommendations for the current user
+ *     description: Returns personalized job recommendations based on user's skills, experience, location, and interests using ML-based matching algorithm
+ *     tags: [Jobs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Maximum number of recommendations to return
+ *     responses:
+ *       200:
+ *         description: List of recommended jobs with relevance scores
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 recommendations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       job:
+ *                         $ref: '#/components/schemas/Job'
+ *                       score:
+ *                         type: number
+ *                         description: Overall relevance score (0-1)
+ *                       breakdown:
+ *                         type: object
+ *                         properties:
+ *                           skillMatch:
+ *                             type: string
+ *                             description: Skill match percentage
+ *                           experienceMatch:
+ *                             type: string
+ *                             description: Experience match percentage
+ *                           locationMatch:
+ *                             type: string
+ *                             description: Location match percentage
+ *                           keywordMatch:
+ *                             type: string
+ *                             description: Keyword match percentage
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Only job seekers can get recommendations
+ *       404:
+ *         description: User profile not found
+ */
+router.get("/recommendations", auth, authorize("seeker"), async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const recommendations = await getRecommendedJobs(req.user._id, limit);
+
+    res.json({
+      recommendations,
+      count: recommendations.length,
+      message: recommendations.length === 0
+        ? "No suitable job recommendations found at this time. Try updating your profile with more skills and experience."
+        : `Found ${recommendations.length} job recommendations based on your profile`,
+    });
+  } catch (error) {
+    console.error("Get recommendations error:", error);
+    if (error.message === "User profile not found") {
+      return res.status(404).json({ message: "Please complete your profile to get job recommendations" });
+    }
     res.status(500).json({ message: "Server error" });
   }
 });
