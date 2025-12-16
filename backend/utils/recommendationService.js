@@ -1,4 +1,5 @@
 const { Job, JobSeekerProfile, Application, Wishlist } = require("../models");
+const { getGeminiRecommendations } = require("./geminiRecommendationService");
 
 /**
  * Calculate similarity score between user skills and job requirements
@@ -156,9 +157,24 @@ const calculateRecencyBonus = (jobCreatedAt) => {
 /**
  * Main recommendation algorithm
  * Returns recommended jobs for a user with relevance scores
+ * Now uses Gemini API for AI-powered filtering
  */
 const getRecommendedJobs = async (userId, limit = 10) => {
   try {
+    // Check if Gemini API is available
+    const useGemini = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "";
+    
+    if (useGemini) {
+      // Use Gemini AI for recommendations
+      try {
+        return await getGeminiRecommendations(userId, limit);
+      } catch (geminiError) {
+        console.error("Gemini API error, falling back to traditional algorithm:", geminiError);
+        // Fall back to traditional algorithm if Gemini fails
+      }
+    }
+
+    // Traditional algorithm (fallback when Gemini is not available or fails)
     // Get user profile
     const profile = await JobSeekerProfile.findOne({ user: userId });
     if (!profile) {
