@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { User, JobSeekerProfile, CompanyProfile } = require("../models");
+const { User, JobSeekerProfile, CompanyProfile, Application, Job, Wishlist, ActivityLog } = require("../models");
 const { generateToken } = require("../middleware");
 
 /**
@@ -350,9 +350,6 @@ router.delete("/delete-account", require("../middleware").auth, async (req, res)
     if (!isMatch) {
       return res.status(400).json({ message: "Incorrect password" });
     }
-
-    // Import models for cleanup
-    const { Application, Job, Wishlist, ActivityLog } = require("../models");
 
     // Delete all associated data based on role
     if (user.role === "seeker") {

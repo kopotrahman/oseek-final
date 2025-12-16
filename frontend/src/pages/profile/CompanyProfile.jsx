@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react"
+import { useNavigate } from "react-router-dom"
 import Header from "../../components/Header"
 import { API_ENDPOINTS, getAuthHeaders } from "../../config/api"
 import { Edit2 } from "lucide-react"
 
 export default function CompanyProfile() {
+  const navigate = useNavigate()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -196,7 +198,7 @@ export default function CompanyProfile() {
       if (response.ok) {
         // Clear local storage and redirect to home
         localStorage.clear()
-        window.location.href = "/"
+        navigate("/")
       } else {
         setError(data.message || "Failed to delete account")
       }
@@ -205,9 +207,7 @@ export default function CompanyProfile() {
       setError("Network error. Please try again later.")
     } finally {
       setDeletingAccount(false)
-      }
     }
-    reader.readAsDataURL(file)
   }
 
   if (loading) {
