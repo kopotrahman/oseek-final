@@ -6,6 +6,7 @@ const applicationRoutes = require("./applications");
 const dashboardRoutes = require("./dashboard");
 const adminRoutes = require("./admin");
 const wishlistRoutes = require("./wishlist");
+const notificationRoutes = require("./notifications");
 
 module.exports = {
   authRoutes,
@@ -16,4 +17,5 @@ module.exports = {
   dashboardRoutes,
   adminRoutes,
   wishlistRoutes,
+  notificationRoutes,
 };

@@ -159,18 +159,20 @@ router.get("/activity", auth, async (req, res) => {
     // Get activity logs from the ActivityLog collection
     const activityLogs = await ActivityLog.find({ user: req.user._id })
       .populate("relatedJob", "title")
+      .populate("relatedApplication")
       .sort({ createdAt: -1 })
       .limit(limit);
 
     const activities = activityLogs.map((log) => ({
+      _id: log._id,
       type: log.type,
       description: log.description,
-      title: log.relatedJob?.title || "",
-      timestamp: log.createdAt,
+      relatedJob: log.relatedJob ? { title: log.relatedJob.title, _id: log.relatedJob._id } : null,
+      createdAt: log.createdAt,
       metadata: log.metadata,
     }));
 
-    // Fallback to old method if no activity logs found
+    // Fallback to old method if no activity logs found - generate from actual data
     if (activities.length === 0) {
       if (req.user.role === "seeker") {
         const applications = await Application.find({ applicant: req.user._id })
@@ -180,48 +182,69 @@ router.get("/activity", auth, async (req, res) => {
 
         applications.forEach((app) => {
           activities.push({
-            type: "application",
-            action: app.status === "pending" ? "submitted" : `updated to ${app.status}`,
-            title: app.job?.title || "Unknown Job",
-            timestamp: app.updatedAt,
+            _id: app._id,
+            type: app.status === "pending" ? "application_submitted" : "application_updated",
+            description: app.status === "pending" 
+              ? `Applied to ${app.job?.title || "Unknown Job"}`
+              : `Application ${app.status} for ${app.job?.title || "Unknown Job"}`,
+            relatedJob: app.job ? { title: app.job.title, _id: app.job._id } : null,
+            createdAt: app.updatedAt,
+            metadata: { status: app.status },
           });
         });
-      } else {
-        const jobs = await Job.find({ company: req.user._id });
+      } else if (req.user.role === "company") {
+        const jobs = await Job.find({ company: req.user._id }).sort({ createdAt: -1 });
         const jobIds = jobs.map((job) => job._id);
 
+        // Get recent applications to company's jobs
         const applications = await Application.find({ job: { $in: jobIds } })
           .populate("job", "title")
           .populate("applicant", "name")
           .sort({ createdAt: -1 })
-          .limit(limit);
+          .limit(Math.floor(limit / 2));
 
         applications.forEach((app) => {
+          const description = app.status === "pending"
+            ? `${app.applicant?.name || "Someone"} applied to ${app.job?.title || "your job"}`
+            : `${app.applicant?.name || "Applicant"} ${app.status} for ${app.job?.title || "your job"}`;
+          
           activities.push({
-            type: "new_application",
-            action: "received",
-            title: `${app.applicant?.name || "Someone"} applied to ${app.job?.title || "Unknown Job"}`,
-            timestamp: app.createdAt,
+            _id: app._id,
+            type: app.status === "pending" ? "application_received" : "application_updated",
+            description,
+            relatedJob: app.job ? { title: app.job.title, _id: app.job._id } : null,
+            createdAt: app.createdAt,
+            metadata: { 
+              status: app.status,
+              applicantName: app.applicant?.name,
+            },
           });
         });
 
-        jobs
-          .sort((a, b) => b.createdAt - a.createdAt)
-          .slice(0, limit)
-          .forEach((job) => {
-            activities.push({
-              type: "job_created",
-              action: "created",
-              title: job.title,
-              timestamp: job.createdAt,
-            });
+        // Add job posting activities
+        jobs.slice(0, Math.floor(limit / 2)).forEach((job) => {
+          const description = job.status === "open"
+            ? `Posted job: ${job.title}`
+            : `Updated job status to ${job.status}: ${job.title}`;
+          
+          activities.push({
+            _id: job._id,
+            type: job.status === "open" ? "job_posted" : "job_updated",
+            description,
+            relatedJob: { title: job.title, _id: job._id },
+            createdAt: job.createdAt,
+            metadata: { 
+              status: job.status,
+              applicationsCount: job.applicationsCount || 0,
+            },
           });
+        });
       }
 
-      activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      activities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
 
-    res.json(activities.slice(0, limit));
+    res.json({ activities: activities.slice(0, limit) });
   } catch (error) {
     console.error("Get activity error:", error);
     res.status(500).json({ message: "Server error" });
