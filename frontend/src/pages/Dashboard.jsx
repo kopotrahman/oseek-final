@@ -68,14 +68,15 @@ export default function Dashboard() {
     <>
       <div className="grid md:grid-cols-4 gap-6 mb-12">
         {[
-          { icon: <FileText size={32} />, label: "Profile Views", value: stats?.profileViews || 0 },
-          { icon: <Users size={32} />, label: "Connections", value: stats?.connections || 0 },
-          { icon: <BarChart3 size={32} />, label: "Applications", value: stats?.applications || 0 },
-          { icon: <Settings size={32} />, label: "Settings", value: "Configure" },
+          { icon: <FileText size={32} />, label: "Profile Views", value: stats?.profileViews || 0, path: "/profile-views" },
+          { icon: <Users size={32} />, label: "Connections", value: stats?.connections || 0, path: "/connections" },
+          { icon: <BarChart3 size={32} />, label: "Applications", value: stats?.applications || 0, path: "/activity" },
+          { icon: <Settings size={32} />, label: "Settings", value: "Configure", path: "/settings" },
         ].map((card, idx) => (
           <div
             key={idx}
-            className="bg-[#16213e] border border-[#2d2d4d] rounded-xl p-6 neon-glow hover:border-[#0066ff] transition"
+            onClick={() => navigate(card.path)}
+            className="bg-[#16213e] border border-[#2d2d4d] rounded-xl p-6 neon-glow hover:border-[#0066ff] transition cursor-pointer"
           >
             <div className="text-[#00d9ff] mb-4">{card.icon}</div>
             <p className="text-[#a0a0c0] text-sm font-medium">{card.label}</p>
