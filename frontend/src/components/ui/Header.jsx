@@ -1,7 +1,8 @@
-import { LogOut, Briefcase, Heart, Clock, Bell, LayoutDashboard, User, Menu, X } from "lucide-react";
+import { LogOut, Briefcase, Heart, Clock, Bell, LayoutDashboard, User, Menu, X, Sun, Moon } from "lucide-react";
 import { useSyncExternalStore, useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_ENDPOINTS, getAuthHeaders } from "../../config/api";
+import { useTheme } from "../../context/ThemeContext";
 import Dashboard from "@/pages/Dashboard";
 
 function subscribeToStorage(callback) {
@@ -19,6 +20,7 @@ function getServerSnapshot() {
 
 export default function Header() {
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
   const token = useSyncExternalStore(
     subscribeToStorage,
     getTokenSnapshot,
@@ -149,6 +151,13 @@ export default function Header() {
                 
               </button>
               <button
+                onClick={toggleTheme}
+                className="flex items-center gap-2 px-3 py-2 text-text-secondary hover:text-text transition"
+                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+              <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-surface transition"
               >
@@ -170,7 +179,13 @@ export default function Header() {
               >
                 Sign Up
               </button>
-              
+              <button
+                onClick={toggleTheme}
+                className="flex items-center gap-2 px-3 py-2 text-text-secondary hover:text-text transition"
+                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
             </>
           )}
         </nav>
@@ -278,6 +293,13 @@ export default function Header() {
                   Dashboard
                 </button>
                 <button
+                  onClick={toggleTheme}
+                  className="flex items-center gap-2 px-4 py-3 text-text-secondary hover:text-text hover:bg-surface rounded-lg transition text-left"
+                >
+                  {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                </button>
+                <button
                   onClick={() => {
                     handleLogout();
                     setMobileMenuOpen(false);
@@ -307,6 +329,13 @@ export default function Header() {
                   className="px-4 py-3 bg-primary text-background rounded-lg font-semibold hover:bg-primary-dark transition text-center"
                 >
                   Sign Up
+                </button>
+                <button
+                  onClick={toggleTheme}
+                  className="flex items-center gap-2 px-4 py-3 text-text-secondary hover:text-text hover:bg-surface rounded-lg transition text-left border-t border-border mt-2 pt-4"
+                >
+                  {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
                 </button>
               </>
             )}
