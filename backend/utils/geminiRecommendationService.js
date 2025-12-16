@@ -88,7 +88,7 @@ const getGeminiRecommendations = async (userId, limit = 10) => {
 
     // Initialize Gemini
     const genAI = initializeGemini();
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // Create the prompt for Gemini
     const prompt = `You are an AI job recommendation assistant. Analyze the following user profile and job listings to recommend the most suitable jobs.
