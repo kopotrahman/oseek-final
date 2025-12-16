@@ -533,7 +533,12 @@ export default function Jobs() {
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `${applicantName?.replace(/\s+/g, '_') || 'Applicant'}_CV.pdf`
+        // Sanitize filename by removing all problematic characters for filenames
+        const sanitizedName = (applicantName || 'Applicant')
+          .replace(/[/\\:*?"<>|]/g, '') // Remove invalid filename characters
+          .replace(/\s+/g, '_') // Replace spaces with underscores
+          .substring(0, 50) // Limit length
+        a.download = `${sanitizedName}_CV.pdf`
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)

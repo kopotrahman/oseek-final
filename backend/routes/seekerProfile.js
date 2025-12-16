@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const PDFDocument = require("pdfkit");
-const { JobSeekerProfile } = require("../models");
+const { JobSeekerProfile, Application, Job } = require("../models");
 const { auth, authorize } = require("../middleware");
 
 /**
@@ -828,25 +828,18 @@ router.get("/download-cv", auth, authorize("seeker"), async (req, res) => {
  */
 router.get("/:userId/download-cv", auth, authorize("company"), async (req, res) => {
   try {
-    const { Application, Job } = require("../models");
+    // First, get all jobs owned by this company
+    const companyJobs = await Job.find({ company: req.user._id }).select('_id');
+    const companyJobIds = companyJobs.map(job => job._id);
     
     // Verify that this seeker has applied to at least one job from this company
-    const hasApplied = await Application.findOne({
-      applicant: req.params.userId
-    }).populate('job');
-    
-    if (!hasApplied) {
-      return res.status(403).json({ message: "Not authorized to download this CV" });
-    }
-    
-    // Check if the job belongs to the requesting company
-    const jobBelongsToCompany = await Job.findOne({
-      _id: hasApplied.job._id,
-      company: req.user._id
+    const hasAppliedToCompany = await Application.findOne({
+      applicant: req.params.userId,
+      job: { $in: companyJobIds }
     });
     
-    if (!jobBelongsToCompany) {
-      return res.status(403).json({ message: "Not authorized to download this CV" });
+    if (!hasAppliedToCompany) {
+      return res.status(403).json({ message: "Not authorized to download this CV. This applicant has not applied to your jobs." });
     }
 
     const profile = await JobSeekerProfile.findOne({ user: req.params.userId });
