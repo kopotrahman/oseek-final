@@ -519,6 +519,40 @@ export default function Jobs() {
     }
   }
 
+  const downloadApplicantCV = async (userId, applicantName) => {
+    try {
+      const headers = getAuthHeaders()
+      delete headers['Content-Type'] // Remove Content-Type for blob response
+      
+      const response = await fetch(API_ENDPOINTS.profile.seeker.downloadApplicantCV(userId), {
+        headers: headers
+      })
+      
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        // Sanitize filename by removing all problematic characters for filenames
+        const sanitizedName = (applicantName || 'Applicant')
+          .replace(/[/\\:*?"<>|]/g, '') // Remove invalid filename characters
+          .replace(/\s+/g, '_') // Replace spaces with underscores
+          .substring(0, 50) // Limit length
+        a.download = `${sanitizedName}_CV.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+      } else {
+        const data = await response.json()
+        setError(data.message || "Failed to download CV")
+      }
+    } catch (err) {
+      console.error("Download CV error:", err)
+      setError("Network error. Please try again later.")
+    }
+  }
+
   const sendInterviewInvitation = async () => {
     if (!interviewMessage.trim()) {
       // Show error in modal context
@@ -884,13 +918,25 @@ export default function Jobs() {
                                         </button>
                                       ))}
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-wrap gap-2">
                                       {application.applicantProfile?._id && (
                                         <button
                                           onClick={() => viewApplicantProfile(application.applicantProfile._id)}
                                           className="px-4 py-2 bg-[#0066ff]/20 text-[#0066ff] border border-[#0066ff]/50 rounded-lg font-semibold hover:bg-[#0066ff]/30 transition text-sm"
                                         >
                                           View Profile
+                                        </button>
+                                      )}
+                                      {application.applicant?._id && (
+                                        <button
+                                          onClick={() => {
+                                            // Use applicant.name from User model, fallback to applicantProfile.fullName from JobSeekerProfile
+                                            const applicantName = application.applicant?.name || application.applicantProfile?.fullName || 'Applicant'
+                                            downloadApplicantCV(application.applicant._id, applicantName)
+                                          }}
+                                          className="px-4 py-2 bg-purple-500/20 text-purple-400 border border-purple-500/50 rounded-lg font-semibold hover:bg-purple-500/30 transition text-sm"
+                                        >
+                                          Download CV
                                         </button>
                                       )}
                                       <button
@@ -1312,14 +1358,29 @@ export default function Jobs() {
       {profileModal.show && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-3xl w-full my-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-[#e0e0ff]">Applicant Profile</h2>
-              <button
-                onClick={() => setProfileModal({ show: false, profileId: null, profile: null })}
-                className="text-[#a0a0c0] hover:text-[#e0e0ff] transition"
-              >
-                ✕
-              </button>
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-[#e0e0ff]">Applicant Profile</h2>
+              </div>
+              <div className="flex gap-2 items-center">
+                {profileModal.profile?.user && (
+                  <button
+                    onClick={() => downloadApplicantCV(
+                      profileModal.profile.user,
+                      profileModal.profile.fullName
+                    )}
+                    className="px-4 py-2 bg-purple-500/20 text-purple-400 border border-purple-500/50 rounded-lg font-semibold hover:bg-purple-500/30 transition text-sm"
+                  >
+                    Download CV
+                  </button>
+                )}
+                <button
+                  onClick={() => setProfileModal({ show: false, profileId: null, profile: null })}
+                  className="text-[#a0a0c0] hover:text-[#e0e0ff] transition text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {loadingProfile ? (
@@ -1328,6 +1389,19 @@ export default function Jobs() {
               </div>
             ) : profileModal.profile ? (
               <div className="space-y-6">
+                {/* Profile Picture */}
+                {profileModal.profile.profilePicture && (
+                  <div className="flex justify-center mb-4">
+                    <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#0066ff] bg-[#0f0f1e]">
+                      <img 
+                        src={profileModal.profile.profilePicture} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+                )}
+                
                 {/* Basic Info */}
                 <div>
                   <h3 className="text-xl font-semibold text-[#e0e0ff] mb-2">{profileModal.profile.fullName}</h3>
