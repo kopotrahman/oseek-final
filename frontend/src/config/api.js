@@ -51,6 +51,7 @@ export const API_ENDPOINTS = {
     updateStatus: (id) => `${API_BASE_URL}/applications/${id}/status`,
     withdraw: (id) => `${API_BASE_URL}/applications/${id}`,
     callForInterview: (id) => `${API_BASE_URL}/applications/${id}/call-for-interview`,
+    sendEmail: (id) => `${API_BASE_URL}/applications/${id}/send-email`,
     bulkEmail: (jobId) => `${API_BASE_URL}/applications/job/${jobId}/bulk-email`,
   },
   dashboard: {

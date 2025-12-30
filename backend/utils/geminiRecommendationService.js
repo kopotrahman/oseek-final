@@ -197,7 +197,167 @@ Rules:
   }
 };
 
+/**
+ * AI-powered job description analysis and improvement suggestions
+ */
+const analyzeJobPosting = async (jobData) => {
+  if (!isGeminiAvailable()) {
+    throw new Error("Gemini API is not configured");
+  }
+
+  try {
+    const genAI = initializeGemini();
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+
+    const prompt = `You are a job posting optimization expert. Analyze the following job posting and provide improvement suggestions.
+
+Job Posting:
+- Title: ${jobData.title}
+- Description: ${jobData.description || "Not provided"}
+- Location: ${jobData.location || "Not specified"}
+- Type: ${jobData.type || "Not specified"}
+- Skills Required: ${(jobData.skills || []).join(", ") || "None listed"}
+- Experience: ${jobData.experience || "Not specified"}
+- Salary Range: ${jobData.salary ? `${jobData.salary.min}-${jobData.salary.max} ${jobData.salary.currency}` : "Not specified"}
+
+Provide your analysis in the following JSON format:
+{
+  "overallScore": <number 1-100>,
+  "strengths": [<list of 2-3 positive aspects>],
+  "improvements": [
+    {
+      "area": "<area to improve>",
+      "suggestion": "<specific improvement suggestion>",
+      "priority": "<high/medium/low>"
+    }
+  ],
+  "suggestedKeywords": [<list of 3-5 keywords to add>],
+  "competitiveness": "<rating: excellent/good/average/needs work>",
+  "summary": "<2-3 sentence summary>"
+}
+
+Return ONLY the JSON object, no markdown or additional text.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    // Parse and validate response
+    let analysis;
+    try {
+      // Try to extract JSON from response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        analysis = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("No JSON found in response");
+      }
+    } catch (parseError) {
+      console.error("Failed to parse Gemini analysis response:", parseError);
+      // Return a default analysis structure
+      return {
+        overallScore: 0,
+        strengths: ["Unable to analyze at this time"],
+        improvements: [],
+        suggestedKeywords: [],
+        competitiveness: "needs review",
+        summary: "AI analysis temporarily unavailable. Please try again later.",
+        error: true,
+      };
+    }
+
+    return analysis;
+  } catch (error) {
+    console.error("Gemini job analysis error:", error);
+    throw error;
+  }
+};
+
+/**
+ * AI-powered candidate-job matching analysis
+ */
+const analyzeCandidate = async (candidateProfile, jobData) => {
+  if (!isGeminiAvailable()) {
+    throw new Error("Gemini API is not configured");
+  }
+
+  try {
+    const genAI = initializeGemini();
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+
+    const prompt = `You are an expert recruiter. Analyze how well this candidate matches the job requirements.
+
+Candidate Profile:
+- Name: ${candidateProfile.fullName || "Anonymous"}
+- Headline: ${candidateProfile.headline || "Not provided"}
+- Skills: ${(candidateProfile.skills || []).join(", ") || "None listed"}
+- Location: ${candidateProfile.location || "Not specified"}
+- Bio: ${candidateProfile.bio || "Not provided"}
+- Experience: ${candidateProfile.experience?.map(e => `${e.title} at ${e.company} (${e.duration})`).join("; ") || "No experience listed"}
+- Education: ${candidateProfile.education?.map(e => `${e.degree} from ${e.school} (${e.year})`).join("; ") || "No education listed"}
+
+Job Requirements:
+- Title: ${jobData.title}
+- Description: ${jobData.description || "Not provided"}
+- Required Skills: ${(jobData.skills || []).join(", ") || "None specified"}
+- Experience Required: ${jobData.experience || "Not specified"}
+- Location: ${jobData.location || "Not specified"}
+
+Provide your analysis in the following JSON format:
+{
+  "matchScore": <number 0-100>,
+  "skillsMatch": {
+    "matched": [<list of matching skills>],
+    "missing": [<list of missing but required skills>],
+    "bonus": [<additional relevant skills the candidate has>]
+  },
+  "experienceMatch": "<assessment of experience fit>",
+  "locationFit": "<assessment of location compatibility>",
+  "strengths": [<list of 2-3 candidate strengths for this role>],
+  "concerns": [<list of any concerns or gaps>],
+  "recommendation": "<hire/consider/not recommended>",
+  "summary": "<2-3 sentence overall assessment>"
+}
+
+Return ONLY the JSON object, no markdown or additional text.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    let analysis;
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        analysis = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("No JSON found in response");
+      }
+    } catch (parseError) {
+      console.error("Failed to parse Gemini candidate analysis:", parseError);
+      return {
+        matchScore: 0,
+        skillsMatch: { matched: [], missing: [], bonus: [] },
+        experienceMatch: "Unable to analyze",
+        locationFit: "Unable to analyze",
+        strengths: [],
+        concerns: [],
+        recommendation: "review manually",
+        summary: "AI analysis temporarily unavailable.",
+        error: true,
+      };
+    }
+
+    return analysis;
+  } catch (error) {
+    console.error("Gemini candidate analysis error:", error);
+    throw error;
+  }
+};
+
 module.exports = {
   getGeminiRecommendations,
   isGeminiAvailable,
+  analyzeJobPosting,
+  analyzeCandidate,
 };

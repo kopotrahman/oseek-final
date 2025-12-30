@@ -42,6 +42,9 @@ export default function Jobs() {
   const [bulkEmailModal, setBulkEmailModal] = useState({ show: false, jobId: null })
   const [bulkEmailForm, setBulkEmailForm] = useState({ subject: "", message: "", status: "" })
   const [sendingBulkEmail, setSendingBulkEmail] = useState(false)
+  const [directEmailModal, setDirectEmailModal] = useState({ show: false, applicationId: null, applicantName: "", jobTitle: "" })
+  const [directEmailForm, setDirectEmailForm] = useState({ subject: "", message: "" })
+  const [sendingDirectEmail, setSendingDirectEmail] = useState(false)
   const [editingJobId, setEditingJobId] = useState(null)
   const [editJobForm, setEditJobForm] = useState({})
   const [updatingJob, setUpdatingJob] = useState(false)
@@ -726,6 +729,37 @@ export default function Jobs() {
     }
   }
 
+  const sendDirectEmail = async () => {
+    if (!directEmailForm.subject.trim() || !directEmailForm.message.trim()) {
+      setJobFormError("Subject and message are required")
+      return
+    }
+
+    setSendingDirectEmail(true)
+    setJobFormError("")
+    try {
+      const response = await fetch(API_ENDPOINTS.applications.sendEmail(directEmailModal.applicationId), {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(directEmailForm),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setJobFormSuccess("Email sent successfully!")
+        setDirectEmailModal({ show: false, applicationId: null, applicantName: "", jobTitle: "" })
+        setDirectEmailForm({ subject: "", message: "" })
+      } else {
+        setJobFormError(data.message || "Failed to send email")
+      }
+    } catch (err) {
+      console.error("Send direct email error:", err)
+      setJobFormError("Network error. Please try again later.")
+    } finally {
+      setSendingDirectEmail(false)
+    }
+  }
+
   const handlePrevPage = () => {
     if (page > 1) {
       setPage(page - 1)
@@ -1026,22 +1060,50 @@ export default function Jobs() {
                                   </div>
                                   <div className="flex flex-col gap-2 items-start md:items-end">
                                     <span className="text-sm text-[#a0a0c0]">
-                                      Status: <span className="text-[#e0e0ff] font-semibold">{application.status}</span>
+                                      Status: <span className={`font-semibold ${
+                                        application.status === 'hired' ? 'text-green-400' :
+                                        application.status === 'interview' ? 'text-yellow-400' :
+                                        application.status === 'accepted' ? 'text-blue-400' :
+                                        application.status === 'rejected' ? 'text-red-400' :
+                                        'text-[#e0e0ff]'
+                                      }`}>{application.status}</span>
                                     </span>
+                                    {/* Hiring Pipeline: Workflow buttons */}
                                     <div className="flex flex-wrap gap-2">
-                                      {["pending", "reviewing", "shortlisted", "interview", "hired", "accepted", "rejected"].map((status) => (
+                                      <span className="text-xs text-[#a0a0c0] w-full mb-1">Workflow:</span>
+                                      {[
+                                        { status: "pending", label: "Pending", color: "border-gray-500" },
+                                        { status: "reviewing", label: "Reviewing", color: "border-blue-400" },
+                                        { status: "shortlisted", label: "Shortlist", color: "border-cyan-400" },
+                                        { status: "accepted", label: "Accept", color: "border-green-400" },
+                                        { status: "interview", label: "Interview", color: "border-yellow-400" },
+                                        { status: "hired", label: "Hire", color: "border-emerald-400" },
+                                      ].map(({ status, label, color }) => (
                                         <button
                                           key={status}
                                           onClick={() => updateApplicationStatus(application._id, status, job._id)}
-                                          className={`px-3 py-1 rounded-lg text-sm border ${
+                                          className={`px-3 py-1 rounded-lg text-sm border transition ${
                                             application.status === status
-                                              ? "bg-[#0066ff] text-white border-[#0066ff]"
-                                              : "bg-transparent text-[#e0e0ff] border-[#2d2d4d] hover:border-[#0066ff]"
+                                              ? status === 'hired' ? 'bg-emerald-500 text-white border-emerald-500' :
+                                                status === 'interview' ? 'bg-yellow-500 text-black border-yellow-500' :
+                                                status === 'accepted' ? 'bg-green-500 text-white border-green-500' :
+                                                'bg-[#0066ff] text-white border-[#0066ff]'
+                                              : `bg-transparent text-[#e0e0ff] ${color} hover:border-[#0066ff]`
                                           }`}
                                         >
-                                          {status}
+                                          {label}
                                         </button>
                                       ))}
+                                      <button
+                                        onClick={() => updateApplicationStatus(application._id, "rejected", job._id)}
+                                        className={`px-3 py-1 rounded-lg text-sm border transition ${
+                                          application.status === "rejected"
+                                            ? "bg-red-500 text-white border-red-500"
+                                            : "bg-transparent text-red-400 border-red-500/50 hover:border-red-500"
+                                        }`}
+                                      >
+                                        Reject
+                                      </button>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
                                       {application.applicantProfile?._id && (
@@ -1069,6 +1131,17 @@ export default function Jobs() {
                                         className="px-4 py-2 bg-green-500/20 text-green-400 border border-green-500/50 rounded-lg font-semibold hover:bg-green-500/30 transition text-sm"
                                       >
                                         Call for Interview
+                                      </button>
+                                      <button
+                                        onClick={() => setDirectEmailModal({ 
+                                          show: true, 
+                                          applicationId: application._id, 
+                                          applicantName: application.applicant?.name || application.applicantProfile?.fullName || 'Applicant',
+                                          jobTitle: job.title
+                                        })}
+                                        className="px-4 py-2 bg-orange-500/20 text-orange-400 border border-orange-500/50 rounded-lg font-semibold hover:bg-orange-500/30 transition text-sm"
+                                      >
+                                        Send Email
                                       </button>
                                     </div>
                                   </div>
@@ -1299,6 +1372,14 @@ export default function Jobs() {
                           ))}
                         </div>
                       )}
+                      {/* Job Description */}
+                      {job.description && (
+                        <div className="mt-4 pt-3 border-t border-[#2d2d4d]">
+                          <p className="text-[#cbd5f5] text-sm leading-relaxed line-clamp-3">
+                            {job.description}
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <div className="ml-4 flex flex-col gap-2">
                       {isSeeker && (
@@ -1475,6 +1556,67 @@ export default function Jobs() {
                 onClick={() => {
                   setBulkEmailModal({ show: false, jobId: null })
                   setBulkEmailForm({ subject: "", message: "", status: "" })
+                }}
+                className="flex-1 px-4 py-2 border border-[#2d2d4d] text-[#e0e0ff] rounded-lg font-semibold hover:border-[#0066ff] transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Direct Email Modal */}
+      {directEmailModal.show && (
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto">
+          <div className="bg-[#16213e] border border-[#2d2d4d] rounded-2xl p-8 max-w-lg w-full m-4 my-8">
+            <h2 className="text-2xl font-bold text-[#e0e0ff] mb-4">Send Email to Applicant</h2>
+            <p className="text-[#a0a0c0] mb-4">
+              Send a direct email to <span className="text-[#00d9ff]">{directEmailModal.applicantName}</span> regarding their application for <span className="text-[#00d9ff]">{directEmailModal.jobTitle}</span>
+            </p>
+            
+            {jobFormError && directEmailModal.show && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                {jobFormError}
+              </div>
+            )}
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[#a0a0c0] mb-2 font-medium">Subject *</label>
+                <input
+                  type="text"
+                  value={directEmailForm.subject}
+                  onChange={(e) => setDirectEmailForm({ ...directEmailForm, subject: e.target.value })}
+                  placeholder="Email subject"
+                  className="w-full px-4 py-2 bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg text-[#e0e0ff] placeholder-[#9aa1b3] focus:outline-none focus:border-[#0066ff]"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-[#a0a0c0] mb-2 font-medium">Message *</label>
+                <textarea
+                  value={directEmailForm.message}
+                  onChange={(e) => setDirectEmailForm({ ...directEmailForm, message: e.target.value })}
+                  placeholder="Enter your message..."
+                  className="w-full px-4 py-3 bg-[#0f0f1e] border border-[#2d2d4d] rounded-lg text-[#e0e0ff] placeholder-[#9aa1b3] focus:outline-none focus:border-[#0066ff] min-h-[150px]"
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={sendDirectEmail}
+                disabled={sendingDirectEmail}
+                className="flex-1 px-4 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition disabled:opacity-50"
+              >
+                {sendingDirectEmail ? "Sending..." : "Send Email"}
+              </button>
+              <button
+                onClick={() => {
+                  setDirectEmailModal({ show: false, applicationId: null, applicantName: "", jobTitle: "" })
+                  setDirectEmailForm({ subject: "", message: "" })
+                  setJobFormError("")
                 }}
                 className="flex-1 px-4 py-2 border border-[#2d2d4d] text-[#e0e0ff] rounded-lg font-semibold hover:border-[#0066ff] transition"
               >

@@ -5,6 +5,7 @@ const he = require("he");
 const { Application, Job, JobSeekerProfile, ActivityLog, User, CompanyProfile, Notification } = require("../models");
 const { auth, authorize } = require("../middleware");
 const { sendInterviewInvitation, sendEmail } = require("../utils/emailService");
+const { analyzeCandidate, isGeminiAvailable } = require("../utils/geminiRecommendationService");
 
 /**
  * @swagger
@@ -521,6 +522,114 @@ router.post("/:id/call-for-interview", auth, authorize("company"), async (req, r
 
 /**
  * @swagger
+ * /api/applications/{id}/send-email:
+ *   post:
+ *     summary: Send a direct email to an applicant (company only)
+ *     tags: [Applications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Application ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - subject
+ *               - message
+ *             properties:
+ *               subject:
+ *                 type: string
+ *               message:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Email sent successfully
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Application not found
+ */
+router.post("/:id/send-email", auth, authorize("company"), async (req, res) => {
+  try {
+    const { subject, message } = req.body;
+
+    if (!subject || !message) {
+      return res.status(400).json({ message: "Subject and message are required" });
+    }
+
+    const application = await Application.findById(req.params.id)
+      .populate("job")
+      .populate("applicant", "name email");
+
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    if (application.job.company.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // Get company profile
+    const companyProfile = await CompanyProfile.findOne({ user: req.user._id });
+    const companyName = companyProfile?.companyName || req.user.name;
+
+    // Send email
+    const emailResult = await sendEmail({
+      to: application.applicant.email,
+      subject: subject,
+      text: message,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">${he.escape(companyName)}</h2>
+          <p>Regarding your application for: <strong>${he.escape(application.job.title)}</strong></p>
+          <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="white-space: pre-wrap;">${he.escape(message)}</p>
+          </div>
+          <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;" />
+          <p style="color: #6b7280; font-size: 14px;">Best regards,<br/>${he.escape(companyName)}</p>
+        </div>
+      `,
+    });
+
+    if (!emailResult.success) {
+      return res.status(500).json({ message: "Failed to send email" });
+    }
+
+    // Create notification for applicant
+    try {
+      await Notification.create({
+        user: application.applicant._id,
+        type: "application_update",
+        title: `Message from ${companyName}`,
+        message: `You received a message regarding your application for "${application.job.title}"`,
+        relatedJob: application.job._id,
+        metadata: {
+          applicationId: application._id,
+          companyName: companyName,
+          emailSubject: subject,
+        },
+      });
+    } catch (notificationError) {
+      console.error("Error creating notification:", notificationError);
+    }
+
+    res.json({ message: "Email sent successfully" });
+  } catch (error) {
+    console.error("Send email error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
  * /api/applications/job/{jobId}/bulk-email:
  *   post:
  *     summary: Send bulk email to applicants for a specific job (company only)
@@ -628,6 +737,83 @@ router.post("/job/:jobId/bulk-email", auth, authorize("company"), async (req, re
   } catch (error) {
     console.error("Bulk email error:", error);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/applications/{id}/ai-analyze:
+ *   get:
+ *     summary: Get AI-powered analysis of how well a candidate matches the job
+ *     description: Uses AI to analyze candidate-job fit and provide hiring recommendations
+ *     tags: [Applications, AI]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Application ID
+ *     responses:
+ *       200:
+ *         description: AI analysis of candidate-job match
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: Application not found
+ *       503:
+ *         description: AI service not available
+ */
+router.get("/:id/ai-analyze", auth, authorize("company"), async (req, res) => {
+  try {
+    // Check if AI is available
+    if (!isGeminiAvailable()) {
+      return res.status(503).json({
+        message: "AI analysis is not available. Please configure the Gemini API key.",
+        available: false,
+      });
+    }
+
+    const application = await Application.findById(req.params.id)
+      .populate("job")
+      .populate("applicant", "name email");
+
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    if (application.job.company.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized to analyze this application" });
+    }
+
+    // Get the applicant's profile
+    const applicantProfile = await JobSeekerProfile.findOne({ user: application.applicant._id });
+
+    if (!applicantProfile) {
+      return res.status(404).json({ message: "Applicant profile not found" });
+    }
+
+    // Perform AI analysis
+    const analysis = await analyzeCandidate(applicantProfile, application.job);
+
+    res.json({
+      analysis,
+      aiEnabled: true,
+      applicant: {
+        name: applicantProfile.fullName || application.applicant.name,
+        email: application.applicant.email,
+      },
+      job: {
+        title: application.job.title,
+        _id: application.job._id,
+      },
+      message: "AI analysis completed successfully",
+    });
+  } catch (error) {
+    console.error("Candidate analysis error:", error);
+    res.status(500).json({ message: "Error analyzing candidate" });
   }
 });
 

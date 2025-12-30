@@ -995,9 +995,20 @@ router.get("/:id/download-profile-pdf", auth, async (req, res) => {
  */
 router.get("/:id", auth, async (req, res) => {
   try {
-    const profile = await JobSeekerProfile.findById(req.params.id)
-      .populate('user', 'name')
-      .select('-email -phone'); // Exclude sensitive fields for public view
+    // Determine if company should see full profile (when viewing an applicant)
+    const isCompanyViewer = req.user?.role === 'company';
+    
+    // For companies viewing applicants, include contact info
+    // For other viewers (seekers, public), exclude sensitive fields
+    let profileQuery = JobSeekerProfile.findById(req.params.id)
+      .populate('user', 'name email');
+    
+    // Only exclude sensitive fields if viewer is not a company
+    if (!isCompanyViewer) {
+      profileQuery = profileQuery.select('-email -phone');
+    }
+    
+    const profile = await profileQuery;
     
     if (!profile) {
       return res.status(404).json({ message: "Profile not found" });

@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const { Job, Application, CompanyProfile, Wishlist, User } = require("../models");
+const { Job, Application, CompanyProfile, Wishlist, User, Notification } = require("../models");
 const { auth, authorize } = require("../middleware");
 const { sendWishlistNotification } = require("../utils/emailService");
 const { getRecommendedJobs } = require("../utils/recommendationService");
+const { analyzeJobPosting, isGeminiAvailable } = require("../utils/geminiRecommendationService");
 
 
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -468,6 +469,11 @@ router.put("/:id", auth, authorize("company"), async (req, res) => {
 
     const updates = req.body;
     const allowedUpdates = ["title", "description", "location", "type", "salary", "skills", "experience", "status", "openings"];
+    
+    // Check if status is changing to 'open' (job reactivation)
+    const wasNotOpen = job.status !== "open";
+    const willBeOpen = updates.status === "open";
+    const isReactivating = wasNotOpen && willBeOpen;
 
     Object.keys(updates).forEach((key) => {
       if (allowedUpdates.includes(key)) {
@@ -476,6 +482,53 @@ router.put("/:id", auth, authorize("company"), async (req, res) => {
     });
 
     await job.save();
+
+    // Send notifications to users who have this job in their wishlist when it's reactivated
+    if (isReactivating) {
+      try {
+        // Find all users who have this exact job in their wishlist
+        const wishlists = await Wishlist.find({
+          job: job._id,
+        }).populate("user", "email name");
+
+        // Get company name for notifications
+        const companyProfile = await CompanyProfile.findOne({ user: req.user._id });
+        const companyName = companyProfile?.companyName || "A company";
+
+        // Send notifications and emails to interested users
+        for (const wishlist of wishlists) {
+          if (wishlist.user && wishlist.user.email) {
+            // Send email notification
+            await sendWishlistNotification(
+              wishlist.user.email,
+              job.title,
+              job._id
+            );
+
+            // Create in-app notification
+            try {
+              await Notification.create({
+                user: wishlist.user._id,
+                type: "wishlist_alert",
+                title: "Job Now Open!",
+                message: `Great news! "${job.title}" at ${companyName} is now open for applications!`,
+                relatedJob: job._id,
+                metadata: {
+                  jobTitle: job.title,
+                  companyName: companyName,
+                },
+              });
+            } catch (notifError) {
+              console.error("Error creating wishlist notification:", notifError);
+            }
+          }
+        }
+      } catch (notificationError) {
+        console.error("Error sending wishlist notifications:", notificationError);
+        // Don't fail the update if notifications fail
+      }
+    }
+    
     res.json(job);
   } catch (error) {
     console.error("Update job error:", error);
@@ -603,6 +656,108 @@ router.get("/recommendations", auth, authorize("seeker"), async (req, res) => {
     }
     res.status(500).json({ message: "Server error" });
   }
+});
+
+/**
+ * @swagger
+ * /api/jobs/analyze:
+ *   post:
+ *     summary: Get AI-powered analysis and improvement suggestions for a job posting
+ *     description: Uses AI to analyze job posting quality and provide actionable suggestions
+ *     tags: [Jobs, AI]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - description
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               location:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *               skills:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               experience:
+ *                 type: string
+ *               salary:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: AI analysis of job posting
+ *       503:
+ *         description: AI service not available
+ */
+router.post("/analyze", auth, authorize("company"), async (req, res) => {
+  try {
+    // Check if AI is available
+    if (!isGeminiAvailable()) {
+      return res.status(503).json({
+        message: "AI analysis is not available. Please configure the Gemini API key.",
+        available: false,
+      });
+    }
+
+    const { title, description, location, type, skills, experience, salary } = req.body;
+
+    if (!title || !description) {
+      return res.status(400).json({ message: "Title and description are required for analysis" });
+    }
+
+    const analysis = await analyzeJobPosting({
+      title,
+      description,
+      location,
+      type,
+      skills,
+      experience,
+      salary,
+    });
+
+    res.json({
+      analysis,
+      aiEnabled: true,
+      message: "AI analysis completed successfully",
+    });
+  } catch (error) {
+    console.error("Job analysis error:", error);
+    res.status(500).json({ message: "Error analyzing job posting" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/jobs/ai-status:
+ *   get:
+ *     summary: Check if AI features are available
+ *     tags: [Jobs, AI]
+ *     responses:
+ *       200:
+ *         description: AI availability status
+ */
+router.get("/ai-status", (req, res) => {
+  res.json({
+    available: isGeminiAvailable(),
+    features: {
+      jobRecommendations: true,
+      jobAnalysis: isGeminiAvailable(),
+      candidateAnalysis: isGeminiAvailable(),
+    },
+    message: isGeminiAvailable()
+      ? "AI features are fully available"
+      : "AI features are limited. Configure Gemini API key for full functionality.",
+  });
 });
 
 module.exports = router;
