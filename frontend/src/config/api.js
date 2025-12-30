@@ -43,6 +43,8 @@ export const API_ENDPOINTS = {
     delete: (id) => `${API_BASE_URL}/jobs/${id}`,
     myJobs: `${API_BASE_URL}/jobs/company/my-jobs`,
     recommendations: `${API_BASE_URL}/jobs/recommendations`,
+    aiAnalyze: `${API_BASE_URL}/jobs/analyze`,
+    aiStatus: `${API_BASE_URL}/jobs/ai-status`,
   },
   applications: {
     apply: `${API_BASE_URL}/applications`,
@@ -53,6 +55,7 @@ export const API_ENDPOINTS = {
     callForInterview: (id) => `${API_BASE_URL}/applications/${id}/call-for-interview`,
     sendEmail: (id) => `${API_BASE_URL}/applications/${id}/send-email`,
     bulkEmail: (jobId) => `${API_BASE_URL}/applications/job/${jobId}/bulk-email`,
+    aiAnalyze: (id) => `${API_BASE_URL}/applications/${id}/ai-analyze`,
   },
   dashboard: {
     stats: `${API_BASE_URL}/dashboard/stats`,
