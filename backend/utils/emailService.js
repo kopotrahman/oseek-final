@@ -1,22 +1,19 @@
 const nodemailer = require("nodemailer");
 const he = require("he");
 
-// Create reusable transporter
+
 const createTransporter = () => {
-  // Use environment variables for email configuration
-  // For development, you can use services like Ethereal or Mailtrap
-  // For production, use your actual SMTP service
-  
+
   if (process.env.EMAIL_SERVICE && process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
     return nodemailer.createTransporter({
-      service: process.env.EMAIL_SERVICE, // e.g., 'gmail', 'outlook'
+      service: process.env.EMAIL_SERVICE, 
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASSWORD,
       },
     });
   } else {
-    // For development/testing - logs to console instead of sending
+ 
     console.log("Email service not configured. Using test transporter.");
     return nodemailer.createTransporter({
       streamTransport: true,
@@ -40,7 +37,7 @@ const sendEmail = async ({ to, subject, text, html }) => {
 
     const info = await transporter.sendMail(mailOptions);
     
-    // In test mode, log the email content
+
     if (!process.env.EMAIL_SERVICE) {
       console.log("Test email:", {
         to,
@@ -67,7 +64,7 @@ const sendBulkEmail = async (recipients) => {
       error: result.error || null,
     });
     
-    // Add small delay between emails to avoid rate limiting
+
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   

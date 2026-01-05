@@ -53,6 +53,8 @@ export default function Jobs() {
   const [isPostJobExpanded, setIsPostJobExpanded] = useState(false)
   const [recommendations, setRecommendations] = useState([])
   const [loadingRecommendations, setLoadingRecommendations] = useState(false)
+  const [recommendationMessage, setRecommendationMessage] = useState("")
+  const [recommendationMessageCode, setRecommendationMessageCode] = useState("")
   
   // Refs for timeout cleanup
   const successTimeoutRef = useRef(null)
@@ -120,6 +122,8 @@ export default function Jobs() {
 
   const fetchRecommendations = async () => {
     setLoadingRecommendations(true)
+    setRecommendationMessage("")
+    setRecommendationMessageCode("")
     try {
       const response = await fetch(`${API_ENDPOINTS.jobs.recommendations}?limit=5`, {
         headers: getAuthHeaders(),
@@ -128,9 +132,19 @@ export default function Jobs() {
 
       if (response.ok) {
         setRecommendations(data.recommendations || [])
+        setRecommendationMessage(data.message || "")
+        setRecommendationMessageCode(data.messageCode || "")
+      } else {
+        // Handle error responses
+        setRecommendations([])
+        setRecommendationMessage(data.message || "Unable to fetch recommendations")
+        setRecommendationMessageCode(data.messageCode || "ERROR")
       }
     } catch (err) {
       console.error("Fetch recommendations error:", err)
+      setRecommendations([])
+      setRecommendationMessage("Network error. Please try again later.")
+      setRecommendationMessageCode("NETWORK_ERROR")
     } finally {
       setLoadingRecommendations(false)
     }
@@ -1241,23 +1255,30 @@ export default function Jobs() {
                         </div>
                       </div>
 
+                      {/* AI Reasoning */}
+                      {recommendation.reasoning && (
+                        <div className="mb-3 p-2 bg-[#1a1a2e] rounded text-[#a0a0c0] text-sm italic">
+                          {recommendation.reasoning}
+                        </div>
+                      )}
+
                       {/* Match Breakdown */}
                       <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-[#2d2d4d]">
                         <div className="text-center">
                           <div className="text-[#a0a0c0] text-xs mb-1">Skills</div>
-                          <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown.skillMatch}%</div>
+                          <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown?.skillMatch || "N/A"}%</div>
                         </div>
                         <div className="text-center">
                           <div className="text-[#a0a0c0] text-xs mb-1">Location</div>
-                          <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown.locationMatch}%</div>
+                          <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown?.locationMatch || "N/A"}%</div>
                         </div>
                         <div className="text-center">
                           <div className="text-[#a0a0c0] text-xs mb-1">Experience</div>
-                          <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown.experienceMatch}%</div>
+                          <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown?.experienceMatch || "N/A"}%</div>
                         </div>
                         <div className="text-center">
-                          <div className="text-[#a0a0c0] text-xs mb-1">Type</div>
-                          <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown.typeMatch}%</div>
+                          <div className="text-[#a0a0c0] text-xs mb-1">Relevance</div>
+                          <div className="text-[#e0e0ff] text-sm font-semibold">{recommendation.breakdown?.typeMatch || "N/A"}%</div>
                         </div>
                       </div>
 
@@ -1299,7 +1320,29 @@ export default function Jobs() {
             ) : (
               <div className="text-center py-8">
                 <Sparkles size={48} className="text-[#2d2d4d] mx-auto mb-4" />
-                <p className="text-[#a0a0c0]">Complete your profile to get personalized job recommendations</p>
+                {recommendationMessageCode === "PROFILE_NOT_FOUND" || recommendationMessageCode === "PROFILE_INCOMPLETE" ? (
+                  <>
+                    <p className="text-[#a0a0c0] mb-4">{recommendationMessage || "Complete your profile to get personalized job recommendations"}</p>
+                    <button
+                      onClick={() => navigate("/profile")}
+                      className="px-4 py-2 bg-[#0066ff] text-white rounded-lg font-semibold hover:bg-[#0052cc] transition"
+                    >
+                      Complete Your Profile
+                    </button>
+                  </>
+                ) : recommendationMessageCode === "NO_SUITABLE_JOBS" ? (
+                  <>
+                    <p className="text-[#a0a0c0] mb-2">No suitable jobs found matching your profile</p>
+                    <p className="text-[#6b6b8a] text-sm">Try updating your skills or browse all available jobs below</p>
+                  </>
+                ) : recommendationMessageCode === "NO_JOBS_AVAILABLE" ? (
+                  <>
+                    <p className="text-[#a0a0c0] mb-2">No open positions available right now</p>
+                    <p className="text-[#6b6b8a] text-sm">Check back later for new opportunities!</p>
+                  </>
+                ) : (
+                  <p className="text-[#a0a0c0]">{recommendationMessage || "No recommendations available. Try refreshing."}</p>
+                )}
               </div>
             )}
           </div>

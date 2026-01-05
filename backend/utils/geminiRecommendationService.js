@@ -1,19 +1,36 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { Job, JobSeekerProfile, Application, Wishlist } = require("../models");
+const mongoose = require("mongoose");
+const { Job, JobSeekerProfile, Application, Wishlist, CompanyProfile } = require("../models");
 
-// Configuration constants
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-const MIN_MATCH_SCORE = 0.3;
-const MAX_JOBS_PER_REQUEST = 50; // Limit to avoid token limits
 
-/**
- * Check if Gemini API is available
- */
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const MIN_MATCH_SCORE = 0.25; // Lowered to be more inclusive
+const MAX_JOBS_PER_REQUEST = 50; 
+
 const isGeminiAvailable = () => {
   return process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "";
 };
 
-// Initialize Gemini AI
+// Track if Gemini has failed - to avoid repeated failed calls
+let geminiFailedRecently = false;
+let geminiFailedAt = null;
+const GEMINI_RETRY_AFTER_MS = 5 * 60 * 1000; // Retry after 5 minutes
+
+const shouldSkipGemini = () => {
+  if (!geminiFailedRecently) return false;
+  if (Date.now() - geminiFailedAt > GEMINI_RETRY_AFTER_MS) {
+    geminiFailedRecently = false;
+    return false;
+  }
+  return true;
+};
+
+const markGeminiFailed = () => {
+  geminiFailedRecently = true;
+  geminiFailedAt = Date.now();
+};
+
+
 const initializeGemini = () => {
   if (!isGeminiAvailable()) {
     throw new Error("GEMINI_API_KEY is not configured");
@@ -21,9 +38,7 @@ const initializeGemini = () => {
   return new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 };
 
-/**
- * Format user profile data for Gemini API
- */
+
 const formatUserProfile = (profile) => {
   const userProfile = {
     skills: profile.skills || [],
@@ -32,6 +47,7 @@ const formatUserProfile = (profile) => {
       title: exp.title,
       company: exp.company,
       duration: exp.duration,
+      description: exp.description || "",
     })) || [],
     education: profile.education?.map(edu => ({
       school: edu.school,
@@ -44,107 +60,186 @@ const formatUserProfile = (profile) => {
   return userProfile;
 };
 
-/**
- * Format jobs data for Gemini API
- */
 const formatJobs = (jobs) => {
   return jobs.map(job => ({
     id: job._id.toString(),
     title: job.title,
-    description: job.description,
+    description: job.description?.substring(0, 500) || "", // Limit description length
     location: job.location,
     type: job.type,
     skills: job.skills || [],
     experience: job.experience || "",
-    salary: job.salary ? {
-      min: job.salary.min,
-      max: job.salary.max,
-      currency: job.salary.currency,
-    } : null,
+    companyName: job.companyName || "",
   }));
 };
 
 /**
- * Get AI-powered job recommendations using Gemini API
+ * Check if user profile has enough information for recommendations
  */
+const isProfileComplete = (profile) => {
+  if (!profile) return false;
+  
+  // Check if profile has at least some basic information
+  const hasSkills = profile.skills && profile.skills.length > 0;
+  const hasLocation = profile.location && profile.location.trim() !== "";
+  const hasExperience = profile.experience && profile.experience.length > 0;
+  const hasHeadline = profile.headline && profile.headline.trim() !== "";
+  const hasBio = profile.bio && profile.bio.trim() !== "";
+  
+  // Profile is considered complete if it has at least 2 of these fields
+  const filledFields = [hasSkills, hasLocation, hasExperience, hasHeadline, hasBio].filter(Boolean).length;
+  return filledFields >= 1; // At least one field should be filled
+};
+
 const getGeminiRecommendations = async (userId, limit = 10) => {
   try {
-    // Get user profile
     const profile = await JobSeekerProfile.findOne({ user: userId });
     if (!profile) {
-      throw new Error("User profile not found");
+      const error = new Error("User profile not found");
+      error.code = "PROFILE_NOT_FOUND";
+      throw error;
     }
 
-    // Get jobs user has already applied to
+    // Check if profile has enough information
+    if (!isProfileComplete(profile)) {
+      const error = new Error("Profile is incomplete");
+      error.code = "PROFILE_INCOMPLETE";
+      throw error;
+    }
+
     const applications = await Application.find({ applicant: userId }).select("job");
     const appliedJobIds = applications.map(app => app.job.toString());
 
-    // Get jobs in user's wishlist
     const wishlistItems = await Wishlist.find({ user: userId }).select("job");
     const wishlistJobIds = wishlistItems.map(item => item.job.toString());
 
-    // Get all open jobs (exclude already applied or in wishlist)
-    const jobs = await Job.find({
-      status: "open",
-      _id: { $nin: [...appliedJobIds, ...wishlistJobIds] },
-    }).populate("company", "email").lean();
+    // Combine excluded job IDs and convert to ObjectIds
+    const excludedJobIds = [...appliedJobIds, ...wishlistJobIds];
+    const excludedObjectIds = excludedJobIds.length > 0 
+      ? excludedJobIds.map(id => new mongoose.Types.ObjectId(id))
+      : [];
 
-    if (jobs.length === 0) {
-      return [];
+    // Get all open jobs with company information
+    const matchStage = { status: "open" };
+    if (excludedObjectIds.length > 0) {
+      matchStage._id = { $nin: excludedObjectIds };
     }
 
-    // Limit jobs to avoid token limits
+    const jobs = await Job.aggregate([
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: "companyprofiles",
+          localField: "company",
+          foreignField: "user",
+          as: "companyProfile"
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "company",
+          foreignField: "_id",
+          as: "companyUser"
+        }
+      },
+      {
+        $addFields: {
+          companyName: {
+            $ifNull: [
+              { $arrayElemAt: ["$companyProfile.companyName", 0] },
+              { $arrayElemAt: ["$companyUser.name", 0] },
+              ""
+            ]
+          }
+        }
+      },
+      {
+        $project: {
+          companyProfile: 0,
+          companyUser: 0
+        }
+      }
+    ]);
+
+    if (jobs.length === 0) {
+      return { recommendations: [], message: "NO_JOBS_AVAILABLE" };
+    }
+
     const jobsToProcess = jobs.slice(0, MAX_JOBS_PER_REQUEST);
     if (jobs.length > MAX_JOBS_PER_REQUEST) {
       console.log(`Processing ${MAX_JOBS_PER_REQUEST} out of ${jobs.length} available jobs to stay within API limits`);
     }
 
-    // Format data for Gemini
     const userProfile = formatUserProfile(profile);
     const formattedJobs = formatJobs(jobsToProcess);
 
-    // Initialize Gemini
     const genAI = initializeGemini();
     const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
-    // Create the prompt for Gemini
-    const prompt = `You are an AI job recommendation assistant. Analyze the following user profile and job listings to recommend the most suitable jobs.
+    const prompt = `You are an expert AI job recommendation system. Your task is to match a job seeker with suitable job postings based on their profile.
 
-User Profile:
-- Skills: ${userProfile.skills.join(", ")}
+## USER PROFILE:
+- Skills: ${userProfile.skills.length > 0 ? userProfile.skills.join(", ") : "Not specified"}
 - Location: ${userProfile.location}
-- Headline: ${userProfile.headline}
-- Bio: ${userProfile.bio}
-- Experience: ${JSON.stringify(userProfile.experience)}
-- Education: ${JSON.stringify(userProfile.education)}
+- Headline: ${userProfile.headline || "Not specified"}
+- Bio: ${userProfile.bio || "Not specified"}
+- Work Experience: ${userProfile.experience.length > 0 ? JSON.stringify(userProfile.experience) : "No experience listed"}
+- Education: ${userProfile.education.length > 0 ? JSON.stringify(userProfile.education) : "No education listed"}
 
-Available Jobs:
+## AVAILABLE JOBS:
 ${JSON.stringify(formattedJobs, null, 2)}
 
-Task:
-1. Analyze how well each job matches the user's profile based on:
-   - Skills match
-   - Experience level compatibility
-   - Location compatibility (consider remote jobs favorably)
-   - Educational background alignment
-   - Career goals and interests
+## MATCHING CRITERIA:
+Analyze each job and determine suitability based on:
 
-2. Return ONLY a valid JSON array of job recommendations in this exact format (no markdown, no code blocks, just pure JSON):
+1. **Skills Match** (Most Important): 
+   - Direct skill matches
+   - SYNONYMS and related technologies (e.g., "React" matches "ReactJS", "React.js", "Frontend Development")
+   - Related skill clusters (e.g., "Python" relates to "Django", "Flask", "Data Science")
+   - Transferable skills
+
+2. **Experience Alignment**:
+   - Job titles that are similar or represent career progression
+   - Industry experience relevance
+   - Years of experience compatibility
+
+3. **Location Compatibility**:
+   - Same city/region
+   - Remote jobs are universally compatible
+   - Willingness to relocate (assume moderate flexibility)
+
+4. **Career Trajectory**:
+   - Does this job align with the user's career goals (based on headline/bio)?
+   - Is it a logical next step in their career?
+
+## IMPORTANT MATCHING RULES:
+- Consider synonyms and related terms (JavaScript === JS, Machine Learning === ML === AI)
+- Consider skill hierarchy (knowing "React" implies knowledge of "JavaScript", "HTML", "CSS")
+- A "Frontend Developer" can match "React Developer", "UI Developer", "Web Developer" roles
+- Be inclusive - if there's reasonable relevance, include the job with appropriate score
+- Even partial matches are valuable - a 40% match might still be a good opportunity
+
+## OUTPUT FORMAT:
+Return ONLY a valid JSON array (no markdown, no explanation, just the JSON):
 [
   {
-    "jobId": "job_id_here",
-    "matchScore": 0.85,
-    "reasoning": "Brief explanation of why this job is a good match"
+    "jobId": "exact_job_id_from_list",
+    "matchScore": 0.75,
+    "skillMatch": 0.80,
+    "locationMatch": 0.90,
+    "experienceMatch": 0.70,
+    "reasoning": "Brief 1-2 sentence explanation"
   }
 ]
 
-Rules:
-- Return the top ${limit} most suitable jobs
-- matchScore should be between 0 and 1 (higher is better)
-- Sort by matchScore in descending order
-- Only include jobs with matchScore >= ${MIN_MATCH_SCORE}
-- Return an empty array [] if no suitable jobs found
-- Return ONLY the JSON array, no other text`;
+## RULES:
+- Return up to ${limit} best matching jobs
+- matchScore: 0.0 to 1.0 (weighted average of all factors, skills weighted highest)
+- Include jobs with matchScore >= ${MIN_MATCH_SCORE}
+- Sort by matchScore descending
+- If NO jobs match at all, return empty array []
+- ONLY return the JSON array, nothing else`;
 
     // Call Gemini API
     const result = await model.generateContent(prompt);
@@ -155,12 +250,17 @@ Rules:
     let recommendations;
     try {
       // Remove any markdown code blocks if present
-      const cleanedText = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      let cleanedText = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      // Also try to extract JSON array if there's extra text
+      const jsonMatch = cleanedText.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        cleanedText = jsonMatch[0];
+      }
       recommendations = JSON.parse(cleanedText);
     } catch (parseError) {
       console.error("Failed to parse Gemini response");
       console.error("Parse error:", parseError.message);
-      console.error("Response excerpt (first 200 chars):", text.substring(0, 200));
+      console.error("Response excerpt (first 300 chars):", text.substring(0, 300));
       // Fallback to empty array if parsing fails
       recommendations = [];
     }
@@ -168,7 +268,7 @@ Rules:
     // Validate and format recommendations
     if (!Array.isArray(recommendations)) {
       console.error("Gemini response is not an array:", recommendations);
-      return [];
+      return { recommendations: [], message: "NO_SUITABLE_JOBS" };
     }
 
     // Match recommendations with full job data
@@ -181,18 +281,26 @@ Rules:
         return {
           job,
           score: rec.matchScore,
-          reasoning: rec.reasoning || "AI-powered match",
+          reasoning: rec.reasoning || "AI-powered match based on your profile",
           breakdown: {
-            aiMatch: (rec.matchScore * 100).toFixed(1),
+            skillMatch: rec.skillMatch ? (rec.skillMatch * 100).toFixed(1) : (rec.matchScore * 100).toFixed(1),
+            locationMatch: rec.locationMatch ? (rec.locationMatch * 100).toFixed(1) : "N/A",
+            experienceMatch: rec.experienceMatch ? (rec.experienceMatch * 100).toFixed(1) : "N/A",
+            typeMatch: "N/A", // Will be calculated on frontend if needed
           },
         };
       })
       .filter(rec => rec !== null)
       .slice(0, limit);
 
-    return recommendedJobs;
+    if (recommendedJobs.length === 0) {
+      return { recommendations: [], message: "NO_SUITABLE_JOBS" };
+    }
+
+    return { recommendations: recommendedJobs, message: "SUCCESS" };
   } catch (error) {
     console.error("Gemini recommendation error:", error);
+    // Re-throw with error code for proper handling
     throw error;
   }
 };
@@ -358,6 +466,8 @@ Return ONLY the JSON object, no markdown or additional text.`;
 module.exports = {
   getGeminiRecommendations,
   isGeminiAvailable,
+  shouldSkipGemini,
+  markGeminiFailed,
   analyzeJobPosting,
   analyzeCandidate,
 };

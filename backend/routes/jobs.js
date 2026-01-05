@@ -640,21 +640,54 @@ router.delete("/:id", auth, authorize("company"), async (req, res) => {
 router.get("/recommendations", auth, authorize("seeker"), async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
-    const recommendations = await getRecommendedJobs(req.user._id, limit);
+    const result = await getRecommendedJobs(req.user._id, limit);
+
+    // Handle the new response format
+    const recommendations = result.recommendations || result;
+    const messageCode = result.message || "SUCCESS";
+
+    let message;
+    switch (messageCode) {
+      case "NO_JOBS_AVAILABLE":
+        message = "No open job positions available at the moment. Check back later!";
+        break;
+      case "NO_SUITABLE_JOBS":
+        message = "No suitable jobs found matching your profile. Try updating your skills or check all available jobs.";
+        break;
+      case "SUCCESS":
+        message = `Found ${recommendations.length} job recommendations based on your profile`;
+        break;
+      default:
+        message = recommendations.length === 0
+          ? "No suitable jobs found matching your profile."
+          : `Found ${recommendations.length} job recommendations based on your profile`;
+    }
 
     res.json({
       recommendations,
       count: recommendations.length,
-      message: recommendations.length === 0
-        ? "No suitable job recommendations found at this time. Try updating your profile with more skills and experience."
-        : `Found ${recommendations.length} job recommendations based on your profile`,
+      message,
+      messageCode,
     });
   } catch (error) {
     console.error("Get recommendations error:", error);
-    if (error.message === "User profile not found") {
-      return res.status(404).json({ message: "Please complete your profile to get job recommendations" });
+    if (error.code === "PROFILE_NOT_FOUND" || error.message === "User profile not found") {
+      return res.status(404).json({ 
+        message: "Please complete your profile to get job recommendations",
+        messageCode: "PROFILE_NOT_FOUND",
+        recommendations: [],
+        count: 0,
+      });
     }
-    res.status(500).json({ message: "Server error" });
+    if (error.code === "PROFILE_INCOMPLETE" || error.message === "Profile is incomplete") {
+      return res.status(400).json({ 
+        message: "Please add skills, experience, or location to your profile to get personalized recommendations",
+        messageCode: "PROFILE_INCOMPLETE",
+        recommendations: [],
+        count: 0,
+      });
+    }
+    res.status(500).json({ message: "Server error", recommendations: [], count: 0 });
   }
 });
 
