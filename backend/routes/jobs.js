@@ -281,6 +281,122 @@ router.get("/company/my-jobs", auth, authorize("company"), async (req, res) => {
 
 /**
  * @swagger
+ * /api/jobs/recommendations:
+ *   get:
+ *     summary: Get AI-powered job recommendations for the current user
+ *     description: Returns personalized job recommendations based on user's skills, experience, location, and interests using ML-based matching algorithm
+ *     tags: [Jobs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Maximum number of recommendations to return
+ *     responses:
+ *       200:
+ *         description: List of recommended jobs with relevance scores
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 recommendations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       job:
+ *                         $ref: '#/components/schemas/Job'
+ *                       score:
+ *                         type: number
+ *                         description: Overall relevance score (0-1)
+ *                       breakdown:
+ *                         type: object
+ *                         properties:
+ *                           skillMatch:
+ *                             type: string
+ *                             description: Skill match percentage
+ *                           experienceMatch:
+ *                             type: string
+ *                             description: Experience match percentage
+ *                           locationMatch:
+ *                             type: string
+ *                             description: Location match percentage
+ *                           keywordMatch:
+ *                             type: string
+ *                             description: Keyword match percentage
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Only job seekers can get recommendations
+ *       404:
+ *         description: User profile not found
+ */
+router.get("/recommendations", auth, authorize("seeker"), async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const result = await getRecommendedJobs(req.user._id, limit);
+
+    // Handle the new response format
+    const recommendations = result.recommendations || result;
+    const messageCode = result.message || "SUCCESS";
+
+    let message;
+    switch (messageCode) {
+      case "NO_JOBS_AVAILABLE":
+        message = "You've already applied to or saved all available jobs! Check back later for new opportunities.";
+        break;
+      case "NO_SUITABLE_JOBS":
+        message = "No suitable jobs found matching your profile. Try updating your skills or check all available jobs.";
+        break;
+      case "SUCCESS":
+        message = `Found ${recommendations.length} job recommendations based on your profile`;
+        break;
+      default:
+        message = recommendations.length === 0
+          ? "No suitable jobs found matching your profile."
+          : `Found ${recommendations.length} job recommendations based on your profile`;
+    }
+
+    res.json({
+      recommendations,
+      count: recommendations.length,
+      message,
+      messageCode,
+    });
+  } catch (error) {
+    console.error("Get recommendations error:", error.message, error.stack);
+    if (error.code === "PROFILE_NOT_FOUND" || error.message === "User profile not found") {
+      return res.status(200).json({ 
+        message: "Please complete your profile to get job recommendations",
+        messageCode: "PROFILE_NOT_FOUND",
+        recommendations: [],
+        count: 0,
+      });
+    }
+    if (error.code === "PROFILE_INCOMPLETE" || error.message === "Profile is incomplete") {
+      return res.status(200).json({ 
+        message: "Please add skills, experience, or location to your profile to get personalized recommendations",
+        messageCode: "PROFILE_INCOMPLETE",
+        recommendations: [],
+        count: 0,
+      });
+    }
+    // For any other error, return a user-friendly message with empty recommendations
+    res.status(200).json({ 
+      message: "Unable to load recommendations at the moment. Please try again.",
+      messageCode: "ERROR",
+      recommendations: [], 
+      count: 0 
+    });
+  }
+});
+
+/**
+ * @swagger
  * /api/jobs/{id}:
  *   get:
  *     summary: Get a specific job by ID
@@ -578,122 +694,6 @@ router.delete("/:id", auth, authorize("company"), async (req, res) => {
   } catch (error) {
     console.error("Delete job error:", error);
     res.status(500).json({ message: "Server error" });
-  }
-});
-
-/**
- * @swagger
- * /api/jobs/recommendations:
- *   get:
- *     summary: Get AI-powered job recommendations for the current user
- *     description: Returns personalized job recommendations based on user's skills, experience, location, and interests using ML-based matching algorithm
- *     tags: [Jobs]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Maximum number of recommendations to return
- *     responses:
- *       200:
- *         description: List of recommended jobs with relevance scores
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 recommendations:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       job:
- *                         $ref: '#/components/schemas/Job'
- *                       score:
- *                         type: number
- *                         description: Overall relevance score (0-1)
- *                       breakdown:
- *                         type: object
- *                         properties:
- *                           skillMatch:
- *                             type: string
- *                             description: Skill match percentage
- *                           experienceMatch:
- *                             type: string
- *                             description: Experience match percentage
- *                           locationMatch:
- *                             type: string
- *                             description: Location match percentage
- *                           keywordMatch:
- *                             type: string
- *                             description: Keyword match percentage
- *       401:
- *         description: Not authenticated
- *       403:
- *         description: Only job seekers can get recommendations
- *       404:
- *         description: User profile not found
- */
-router.get("/recommendations", auth, authorize("seeker"), async (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit) || 10;
-    const result = await getRecommendedJobs(req.user._id, limit);
-
-    // Handle the new response format
-    const recommendations = result.recommendations || result;
-    const messageCode = result.message || "SUCCESS";
-
-    let message;
-    switch (messageCode) {
-      case "NO_JOBS_AVAILABLE":
-        message = "You've already applied to or saved all available jobs! Check back later for new opportunities.";
-        break;
-      case "NO_SUITABLE_JOBS":
-        message = "No suitable jobs found matching your profile. Try updating your skills or check all available jobs.";
-        break;
-      case "SUCCESS":
-        message = `Found ${recommendations.length} job recommendations based on your profile`;
-        break;
-      default:
-        message = recommendations.length === 0
-          ? "No suitable jobs found matching your profile."
-          : `Found ${recommendations.length} job recommendations based on your profile`;
-    }
-
-    res.json({
-      recommendations,
-      count: recommendations.length,
-      message,
-      messageCode,
-    });
-  } catch (error) {
-    console.error("Get recommendations error:", error.message, error.stack);
-    if (error.code === "PROFILE_NOT_FOUND" || error.message === "User profile not found") {
-      return res.status(200).json({ 
-        message: "Please complete your profile to get job recommendations",
-        messageCode: "PROFILE_NOT_FOUND",
-        recommendations: [],
-        count: 0,
-      });
-    }
-    if (error.code === "PROFILE_INCOMPLETE" || error.message === "Profile is incomplete") {
-      return res.status(200).json({ 
-        message: "Please add skills, experience, or location to your profile to get personalized recommendations",
-        messageCode: "PROFILE_INCOMPLETE",
-        recommendations: [],
-        count: 0,
-      });
-    }
-    // For any other error, return a user-friendly message with empty recommendations
-    res.status(200).json({ 
-      message: "Unable to load recommendations at the moment. Please try again.",
-      messageCode: "ERROR",
-      recommendations: [], 
-      count: 0 
-    });
   }
 });
 
