@@ -185,7 +185,7 @@ const calculateLocationScore = (userLocation, jobLocation, jobType) => {
 };
 
 /**
- * Extract keywords from user profile (bio, headline, skills)
+ * Extract keywords from user profile (bio, headline, skills, experience, education)
  */
 const extractUserKeywords = (profile) => {
   const keywords = new Set();
@@ -212,6 +212,27 @@ const extractUserKeywords = (profile) => {
     profile.experience.forEach(exp => {
       const titleWords = exp.title.toLowerCase().match(/\b\w{3,}\b/g) || [];
       titleWords.forEach(word => keywords.add(word));
+      // Also add company name keywords
+      if (exp.company) {
+        const companyWords = exp.company.toLowerCase().match(/\b\w{3,}\b/g) || [];
+        companyWords.forEach(word => keywords.add(word));
+      }
+    });
+  }
+
+  // Add education keywords (degree, school, field of study)
+  if (profile.education) {
+    profile.education.forEach(edu => {
+      // Add degree keywords (e.g., "Bachelor", "Computer Science", "Engineering")
+      if (edu.degree) {
+        const degreeWords = edu.degree.toLowerCase().match(/\b\w{3,}\b/g) || [];
+        degreeWords.forEach(word => keywords.add(word));
+      }
+      // Add school name keywords
+      if (edu.school) {
+        const schoolWords = edu.school.toLowerCase().match(/\b\w{3,}\b/g) || [];
+        schoolWords.forEach(word => keywords.add(word));
+      }
     });
   }
 
@@ -257,11 +278,12 @@ const isProfileComplete = (profile) => {
   const hasSkills = profile.skills && profile.skills.length > 0;
   const hasLocation = profile.location && profile.location.trim() !== "";
   const hasExperience = profile.experience && profile.experience.length > 0;
+  const hasEducation = profile.education && profile.education.length > 0;
   const hasHeadline = profile.headline && profile.headline.trim() !== "";
   const hasBio = profile.bio && profile.bio.trim() !== "";
   
   // Profile is considered complete if it has at least one meaningful field
-  const filledFields = [hasSkills, hasLocation, hasExperience, hasHeadline, hasBio].filter(Boolean).length;
+  const filledFields = [hasSkills, hasLocation, hasExperience, hasEducation, hasHeadline, hasBio].filter(Boolean).length;
   return filledFields >= 1;
 };
 

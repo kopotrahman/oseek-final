@@ -1337,8 +1337,18 @@ export default function Jobs() {
                   </>
                 ) : recommendationMessageCode === "NO_JOBS_AVAILABLE" ? (
                   <>
-                    <p className="text-[#a0a0c0] mb-2">No open positions available right now</p>
+                    <p className="text-[#a0a0c0] mb-2">{recommendationMessage || "You've explored all available jobs!"}</p>
                     <p className="text-[#6b6b8a] text-sm">Check back later for new opportunities!</p>
+                  </>
+                ) : recommendationMessageCode === "ERROR" || recommendationMessageCode === "NETWORK_ERROR" ? (
+                  <>
+                    <p className="text-[#a0a0c0] mb-2">{recommendationMessage || "Unable to load recommendations"}</p>
+                    <button
+                      onClick={fetchRecommendations}
+                      className="px-4 py-2 bg-[#2d2d4d] text-white rounded-lg font-semibold hover:bg-[#3d3d5d] transition"
+                    >
+                      Try Again
+                    </button>
                   </>
                 ) : (
                   <p className="text-[#a0a0c0]">{recommendationMessage || "No recommendations available. Try refreshing."}</p>

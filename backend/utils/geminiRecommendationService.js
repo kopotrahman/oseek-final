@@ -83,11 +83,12 @@ const isProfileComplete = (profile) => {
   const hasSkills = profile.skills && profile.skills.length > 0;
   const hasLocation = profile.location && profile.location.trim() !== "";
   const hasExperience = profile.experience && profile.experience.length > 0;
+  const hasEducation = profile.education && profile.education.length > 0;
   const hasHeadline = profile.headline && profile.headline.trim() !== "";
   const hasBio = profile.bio && profile.bio.trim() !== "";
   
-  // Profile is considered complete if it has at least 2 of these fields
-  const filledFields = [hasSkills, hasLocation, hasExperience, hasHeadline, hasBio].filter(Boolean).length;
+  // Profile is considered complete if it has at least one of these fields
+  const filledFields = [hasSkills, hasLocation, hasExperience, hasEducation, hasHeadline, hasBio].filter(Boolean).length;
   return filledFields >= 1; // At least one field should be filled
 };
 

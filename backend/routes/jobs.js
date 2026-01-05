@@ -649,7 +649,7 @@ router.get("/recommendations", auth, authorize("seeker"), async (req, res) => {
     let message;
     switch (messageCode) {
       case "NO_JOBS_AVAILABLE":
-        message = "No open job positions available at the moment. Check back later!";
+        message = "You've already applied to or saved all available jobs! Check back later for new opportunities.";
         break;
       case "NO_SUITABLE_JOBS":
         message = "No suitable jobs found matching your profile. Try updating your skills or check all available jobs.";
@@ -670,9 +670,9 @@ router.get("/recommendations", auth, authorize("seeker"), async (req, res) => {
       messageCode,
     });
   } catch (error) {
-    console.error("Get recommendations error:", error);
+    console.error("Get recommendations error:", error.message, error.stack);
     if (error.code === "PROFILE_NOT_FOUND" || error.message === "User profile not found") {
-      return res.status(404).json({ 
+      return res.status(200).json({ 
         message: "Please complete your profile to get job recommendations",
         messageCode: "PROFILE_NOT_FOUND",
         recommendations: [],
@@ -680,14 +680,20 @@ router.get("/recommendations", auth, authorize("seeker"), async (req, res) => {
       });
     }
     if (error.code === "PROFILE_INCOMPLETE" || error.message === "Profile is incomplete") {
-      return res.status(400).json({ 
+      return res.status(200).json({ 
         message: "Please add skills, experience, or location to your profile to get personalized recommendations",
         messageCode: "PROFILE_INCOMPLETE",
         recommendations: [],
         count: 0,
       });
     }
-    res.status(500).json({ message: "Server error", recommendations: [], count: 0 });
+    // For any other error, return a user-friendly message with empty recommendations
+    res.status(200).json({ 
+      message: "Unable to load recommendations at the moment. Please try again.",
+      messageCode: "ERROR",
+      recommendations: [], 
+      count: 0 
+    });
   }
 });
 
