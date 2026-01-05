@@ -10,200 +10,170 @@ const { auth, authorize } = require("../middleware");
  * @param {Object} profile - The job seeker profile data
  */
 function generateCVContent(doc, profile) {
-  // Define colors matching web design
+  const bgDark = '#0f0f1e';
+  const bgCard = '#16213e';
   const primaryColor = '#0066ff';
   const accentColor = '#00d9ff';
-  const textColor = '#333333';
-  const lightTextColor = '#666666';
+  const textLight = '#e0e0ff';
+  const textMuted = '#a0a0c0';
   
-  // Add profile picture if available
+  const pageWidth = doc.page.width;
+  const margin = 40;
+  const contentWidth = pageWidth - (margin * 2);
+  
+  // Dark background
+  doc.rect(0, 0, pageWidth, doc.page.height).fill(bgDark);
+  
+  let y = 30;
+  
+  // Header card
+  const headerHeight = profile.profilePicture ? 160 : 100;
+  doc.roundedRect(margin, y, contentWidth, headerHeight, 10).fill(bgCard);
+  
+  // Profile picture
   if (profile.profilePicture) {
     try {
-      // Extract base64 data if it includes data URL prefix
       let imageData = profile.profilePicture;
       if (imageData.startsWith('data:')) {
         imageData = imageData.split(',')[1];
       }
-      
-      // Convert base64 to buffer
       const imageBuffer = Buffer.from(imageData, 'base64');
-      
-      // Add profile picture centered at top
-      const imageSize = 80;
-      const pageWidth = doc.page.width;
+      const imageSize = 70;
       const imageX = (pageWidth - imageSize) / 2;
       
-      doc.image(imageBuffer, imageX, 50, { 
-        fit: [imageSize, imageSize],
-        align: 'center'
-      });
+      doc.circle(imageX + imageSize/2, y + 50, imageSize/2 + 3).fill(primaryColor);
+      doc.save();
+      doc.circle(imageX + imageSize/2, y + 50, imageSize/2).clip();
+      doc.image(imageBuffer, imageX, y + 15, { width: imageSize, height: imageSize });
+      doc.restore();
       
-      doc.moveDown(6); // Space after image
-    } catch (imgError) {
-      console.error("Error adding profile picture to CV:", imgError);
-      // Continue without image if there's an error
-      doc.moveDown(1);
+      y += 95;
+    } catch (e) {
+      y += 20;
     }
   } else {
-    doc.moveDown(1);
+    y += 20;
   }
 
-  // Header with name - styled with color
-  doc.fontSize(28)
-     .fillColor(primaryColor)
-     .font("Helvetica-Bold")
-     .text(profile.fullName || "Job Seeker", { align: "center" });
-  doc.moveDown(0.3);
+  // Name
+  doc.fontSize(24).fillColor(textLight).font("Helvetica-Bold")
+     .text(profile.fullName || "Job Seeker", margin, y, { align: "center", width: contentWidth });
+  y += 30;
 
-  // Headline - styled with accent color
+  // Headline
   if (profile.headline) {
-    doc.fontSize(14)
-       .fillColor(accentColor)
-       .font("Helvetica-Bold")
-       .text(profile.headline, { align: "center" });
-    doc.moveDown(0.5);
+    doc.fontSize(12).fillColor(accentColor).font("Helvetica")
+       .text(profile.headline, margin, y, { align: "center", width: contentWidth });
+    y += 20;
   }
-
-  // Contact info - compact and centered
-  doc.fontSize(10)
-     .fillColor(lightTextColor)
-     .font("Helvetica");
   
-  const contactInfo = [];
-  if (profile.email) contactInfo.push(`📧 ${profile.email}`);
-  if (profile.phone) contactInfo.push(`📱 ${profile.phone}`);
-  if (profile.location) contactInfo.push(`📍 ${profile.location}`);
+  y = profile.profilePicture ? 200 : 140;
+
+  // Contact bar
+  doc.roundedRect(margin, y, contentWidth, 30, 6).fill(bgCard);
+  const contactParts = [];
+  if (profile.email) contactParts.push(profile.email);
+  if (profile.phone) contactParts.push(profile.phone);
+  if (profile.location) contactParts.push(profile.location);
   
-  if (contactInfo.length > 0) {
-    doc.text(contactInfo.join("  •  "), { align: "center" });
-    doc.moveDown(1.5);
-  }
+  doc.fontSize(9).fillColor(textMuted).font("Helvetica")
+     .text(contactParts.join("  •  "), margin, y + 10, { align: "center", width: contentWidth });
+  
+  y += 45;
 
-  // Add a horizontal line separator
-  doc.strokeColor(primaryColor)
-     .lineWidth(2)
-     .moveTo(50, doc.y)
-     .lineTo(doc.page.width - 50, doc.y)
-     .stroke();
-  doc.moveDown(1);
-
-  // Bio/Summary section
+  // Bio section
   if (profile.bio) {
-    doc.fontSize(16)
-       .fillColor(primaryColor)
-       .font("Helvetica-Bold")
-       .text("PROFESSIONAL SUMMARY");
-    doc.moveDown(0.5);
+    doc.rect(margin, y, 3, 18).fill(accentColor);
+    doc.fontSize(14).fillColor(textLight).font("Helvetica-Bold")
+       .text("ABOUT ME", margin + 12, y + 2);
+    y += 28;
     
-    doc.fontSize(10)
-       .fillColor(textColor)
-       .font("Helvetica")
-       .text(profile.bio, { align: 'justify' });
-    doc.moveDown(1.5);
+    doc.roundedRect(margin, y, contentWidth, 50, 6).fill(bgCard);
+    doc.fontSize(9).fillColor(textMuted).font("Helvetica")
+       .text(profile.bio, margin + 12, y + 10, { width: contentWidth - 24 });
+    y += 60;
   }
 
-  // Skills section with better formatting
+  // Skills section
   if (profile.skills && profile.skills.length > 0) {
-    doc.fontSize(16)
-       .fillColor(primaryColor)
-       .font("Helvetica-Bold")
-       .text("SKILLS");
-    doc.moveDown(0.5);
+    doc.rect(margin, y, 3, 18).fill(accentColor);
+    doc.fontSize(14).fillColor(textLight).font("Helvetica-Bold")
+       .text("SKILLS", margin + 12, y + 2);
+    y += 28;
     
-    doc.fontSize(10)
-       .fillColor(textColor)
-       .font("Helvetica")
-       .text(profile.skills.join("  •  "), { align: 'left' });
-    doc.moveDown(1.5);
+    let skillX = margin;
+    let skillRowStart = y;
+    
+    profile.skills.forEach((skill) => {
+      const skillWidth = doc.widthOfString(skill, { fontSize: 9 }) + 16;
+      
+      if (skillX + skillWidth > pageWidth - margin) {
+        skillX = margin;
+        y += 26;
+      }
+      
+      doc.roundedRect(skillX, y, skillWidth, 20, 10).fill(primaryColor);
+      doc.fontSize(9).fillColor('#ffffff').font("Helvetica-Bold")
+         .text(skill, skillX + 8, y + 6);
+      
+      skillX += skillWidth + 6;
+    });
+    
+    y += 35;
   }
 
-  // Experience section with enhanced layout
+  // Experience section
   if (profile.experience && profile.experience.length > 0) {
-    doc.fontSize(16)
-       .fillColor(primaryColor)
-       .font("Helvetica-Bold")
-       .text("WORK EXPERIENCE");
-    doc.moveDown(0.5);
+    doc.rect(margin, y, 3, 18).fill(accentColor);
+    doc.fontSize(14).fillColor(textLight).font("Helvetica-Bold")
+       .text("EXPERIENCE", margin + 12, y + 2);
+    y += 28;
 
-    profile.experience.forEach((exp, index) => {
-      // Job title in bold
-      doc.fontSize(12)
-         .fillColor(textColor)
-         .font("Helvetica-Bold")
-         .text(exp.title);
+    profile.experience.forEach((exp) => {
+      doc.roundedRect(margin, y, contentWidth, 55, 6).fill(bgCard);
       
-      // Company and duration with accent color
-      doc.fontSize(10)
-         .fillColor(accentColor)
-         .font("Helvetica")
-         .text(`${exp.company}  •  ${exp.duration}`);
+      doc.fontSize(12).fillColor(textLight).font("Helvetica-Bold")
+         .text(exp.title || "", margin + 12, y + 10);
       
-      // Description
+      doc.fontSize(10).fillColor(accentColor).font("Helvetica")
+         .text(`${exp.company || ""}  •  ${exp.duration || ""}`, margin + 12, y + 26);
+      
       if (exp.description) {
-        doc.fontSize(10)
-           .fillColor(textColor)
-           .font("Helvetica")
-           .text(exp.description, { 
-             indent: 20,
-             paragraphGap: 5
-           });
+        doc.fontSize(9).fillColor(textMuted).font("Helvetica")
+           .text(exp.description, margin + 12, y + 40, { width: contentWidth - 24, lineBreak: false, ellipsis: true });
       }
       
-      if (index < profile.experience.length - 1) {
-        doc.moveDown(0.8);
-      }
+      y += 62;
     });
-
-    doc.moveDown(1.5);
   }
 
-  // Education section with enhanced layout
+  // Education section
   if (profile.education && profile.education.length > 0) {
-    doc.fontSize(16)
-       .fillColor(primaryColor)
-       .font("Helvetica-Bold")
-       .text("EDUCATION");
-    doc.moveDown(0.5);
+    doc.rect(margin, y, 3, 18).fill(accentColor);
+    doc.fontSize(14).fillColor(textLight).font("Helvetica-Bold")
+       .text("EDUCATION", margin + 12, y + 2);
+    y += 28;
 
-    profile.education.forEach((edu, index) => {
-      // Degree in bold
-      doc.fontSize(12)
-         .fillColor(textColor)
-         .font("Helvetica-Bold")
-         .text(edu.degree);
+    profile.education.forEach((edu) => {
+      doc.roundedRect(margin, y, contentWidth, 45, 6).fill(bgCard);
       
-      // School and year with accent color
-      doc.fontSize(10)
-         .fillColor(accentColor)
-         .font("Helvetica")
-         .text(`${edu.school}  •  ${edu.year}`);
+      doc.fontSize(12).fillColor(textLight).font("Helvetica-Bold")
+         .text(edu.degree || "", margin + 12, y + 10);
       
-      if (index < profile.education.length - 1) {
-        doc.moveDown(0.8);
-      }
+      doc.fontSize(10).fillColor(accentColor).font("Helvetica")
+         .text(`${edu.school || ""}  •  ${edu.year || ""}`, margin + 12, y + 26);
+      
+      y += 52;
     });
-
-    doc.moveDown(1.5);
   }
 
-  // Footer with branding
-  const footerY = doc.page.height - 70;
-  if (doc.y < footerY) {
-    doc.y = footerY;
+  // Footer line
+  y = Math.max(y + 10, doc.page.height - 50);
+  if (y < doc.page.height - 30) {
+    doc.rect(margin, y, contentWidth, 1).fill(primaryColor);
+    doc.fontSize(8).fillColor(textMuted).font("Helvetica")
+       .text("Generated from OSEEK Job Portal", margin, y + 8, { align: "center", width: contentWidth });
   }
-  
-  // Add separator line
-  doc.strokeColor(primaryColor)
-     .lineWidth(1)
-     .moveTo(50, doc.y)
-     .lineTo(doc.page.width - 50, doc.y)
-     .stroke();
-  doc.moveDown(0.5);
-  
-  doc.fontSize(8)
-     .fillColor(lightTextColor)
-     .font("Helvetica")
-     .text("Generated from OSEEK Job Portal", { align: "center" });
 }
 
 /**
